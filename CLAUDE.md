@@ -34,6 +34,11 @@ Talk to the owner in Polish; code, names, comments and commits in English.
 - DB-backed API tests run only when `DATABASE_URL` is set (skipped in CI for now).
   Ingest DB tests wipe events of the sources they test – re-run the workers afterwards on a dev DB.
 
+## Web routing
+- Static build (adapter-static). Dynamic pages (`/e/{id}`) are not prerendered: the server
+  must fall back to `200.html` for unknown paths (Caddy: `try_files {path} {path}.html /200.html`).
+- Map state lives in the URL (`?l=&min=&c=&z=&e=`, see `web/src/lib/mapUrl.ts`).
+
 ## Gotchas
 - Repo lives on exFAT: macOS creates `._*` files. They are git/prettier/docker-ignored; delete before tooling if something chokes
   (Alembic crashes on `._*.py` in `db/migrations/versions`).
