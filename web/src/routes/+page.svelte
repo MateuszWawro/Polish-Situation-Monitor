@@ -25,8 +25,22 @@
 	let visible = $state(
 		Object.fromEntries(LAYERS.map((l) => [l.type, true])) as Record<EventType, boolean>
 	);
+	let minSeverity = $state(0);
 	let status: SourceStatus[] = $state([]);
 	let selected: EventProps[] = $state([]);
+	const MIN_SEVERITY_KEY = 'psm.minSeverity';
+	const countFrom = (fc: FeatureCollection | undefined) =>
+		fc?.features.filter((f) => (f.properties?.severity ?? 0) >= minSeverity).length;
+
+	function setMinSeverity(value: number) {
+		minSeverity = value;
+		selected = [];
+		try {
+			localStorage.setItem(MIN_SEVERITY_KEY, String(value)); // per-viewer convenience only
+		} catch {
+			// storage blocked (private mode): the filter still works for this visit
+		}
+	}
 	const groups = $derived(groupEvents(selected));
 	let loadError = $state(false);
 	let panelOpen = $state(false);
@@ -57,6 +71,12 @@
 
 	onMount(() => {
 		panelOpen = matchMedia('(min-width: 720px)').matches;
+		try {
+			const saved = Number(localStorage.getItem(MIN_SEVERITY_KEY));
+			if (saved >= 0 && saved <= 3) minSeverity = saved;
+		} catch {
+			// storage blocked: default filter
+		}
 		loadEvents();
 		loadStatus();
 		const timers = [
@@ -74,7 +94,7 @@
 
 <svelte:head><title>Monitor sytuacyjny Polski – mapa</title></svelte:head>
 
-<MapView {data} {visible} onselect={(events) => (selected = events)} />
+<MapView {data} {visible} {minSeverity} onselect={(events) => (selected = events)} />
 
 <div class="banners" aria-live="polite">
 	{#if loadError}
@@ -101,6 +121,23 @@
 		Warstwy i legenda
 	</button>
 	<div id="layers-body" hidden={!panelOpen}>
+		<fieldset class="min-sev">
+			<legend>Pokaż od stopnia</legend>
+			<div class="segmented">
+				{#each [0, 1, 2, 3] as level (level)}
+					<label>
+						<input
+							type="radio"
+							name="min-severity"
+							value={level}
+							checked={minSeverity === level}
+							onchange={() => setMinSeverity(level)}
+						/>
+						<span>{level === 0 ? 'wszystko' : `${level}+`}</span>
+					</label>
+				{/each}
+			</div>
+		</fieldset>
 		<fieldset>
 			<legend class="sr-only">Widoczne warstwy</legend>
 			{#each LAYERS as layer (layer.type)}
@@ -109,7 +146,7 @@
 					<input type="checkbox" bind:checked={visible[layer.type]} />
 					<span>
 						<strong>{layer.label}</strong>
-						<span class="count">({data[layer.type]?.features.length ?? '…'})</span>
+						<span class="count">({countFrom(data[layer.type]) ?? '…'})</span>
 						<small class:stale={st?.stale}>
 							{layer.sourceName} · aktualizacja: {timeAgo(st?.last_success_at ?? null, now)}
 						</small>
@@ -240,6 +277,50 @@
 		border: 0;
 		margin: 0;
 		padding: 0;
+	}
+	.min-sev {
+		margin-bottom: 0.5rem;
+	}
+	.min-sev legend {
+		font-size: 0.85rem;
+		color: var(--muted);
+		margin-bottom: 0.25rem;
+	}
+	.segmented {
+		display: flex;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		overflow: hidden;
+	}
+	.segmented label {
+		flex: 1;
+		position: relative;
+	}
+	.segmented input {
+		position: absolute;
+		opacity: 0;
+		inset: 0;
+		margin: 0;
+		cursor: pointer;
+	}
+	.segmented span {
+		display: block;
+		min-height: 36px;
+		line-height: 36px;
+		text-align: center;
+		font-size: 0.9rem;
+	}
+	.segmented label + label span {
+		border-left: 1px solid var(--border);
+	}
+	.segmented input:checked + span {
+		background: var(--accent);
+		color: var(--bg);
+		font-weight: 600;
+	}
+	.segmented input:focus-visible + span {
+		outline: 3px solid var(--accent);
+		outline-offset: -3px;
 	}
 	.layer {
 		display: flex;

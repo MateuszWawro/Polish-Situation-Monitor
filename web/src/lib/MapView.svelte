@@ -16,9 +16,11 @@
 	interface Props {
 		data: Partial<Record<EventType, FeatureCollection>>;
 		visible: Record<EventType, boolean>;
+		/** Hide events below this severity (0 = show all). */
+		minSeverity: number;
 		onselect: (events: EventProps[]) => void;
 	}
-	let { data, visible, onselect }: Props = $props();
+	let { data, visible, minSeverity, onselect }: Props = $props();
 
 	let container: HTMLDivElement;
 	let map: MlMap | undefined = $state();
@@ -200,8 +202,11 @@
 		for (const layer of LAYERS) {
 			const fc = data[layer.type];
 			if (fc) (map.getSource(layer.type) as GeoJSONSource).setData(fc);
-			for (const id of layerIds(layer.type))
+			for (const id of layerIds(layer.type)) {
 				map.setLayoutProperty(id, 'visibility', visible[layer.type] ? 'visible' : 'none');
+				// Filtered features are not rendered, so clicks don't hit them either.
+				map.setFilter(id, ['>=', ['get', 'severity'], minSeverity]);
+			}
 		}
 	});
 </script>
