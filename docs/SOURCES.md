@@ -77,6 +77,50 @@ Verified with real requests on **2026-10-15**. Status legend: ✅ verified · �
 
 ---
 
+## 6. GDDKiA – road incidents on national roads ⚠️ (step 0 for pre-launch, 2026-10-15)
+
+### Options checked
+| Option | Result |
+|---|---|
+| **Open XML feed** `https://www.archiwum.gddkia.gov.pl/dane/zima_html/utrdane.xml` | ✅ `200`, `application/xml`, ~580 KB, **550 records**, `Last-Modified` 15:22 UTC, `ETag` present. No key, `robots.txt: Allow: /`. Old URL `www.gddkia.gov.pl/dane/zima_html/utrdane.xml` → 404. |
+| dane.gov.pl dataset [2752 „Utrudnienia na drogach”](https://dane.gov.pl/pl/dataset/2752) (publisher: GDDKiA) | ✅ points to the XML above. **License: CC0 1.0.** Metadata last modified 2024-02-16, frequency „nie dotyczy”. |
+| KPD – Krajowy Punkt Dostępowy (DATEX II), https://kpd.gddkia.gov.pl/ | ⚠️ needs a **formal registration of an organisation** (paper/scan application to GDDKiA), test certificates and a scheduled message-exchange test before production access. Not realistic for a hobby project. |
+
+**Recommendation:** use the open XML feed (CC0). ⚠️ Risk: it lives on an `archiwum.` (archive) domain – it may disappear without notice; KPD is the long-term fallback.
+
+### Format (sample record, trimmed)
+```xml
+<utrudnienia gen="2026-10-15T17:28:02+0200">
+  <utr><typ>U</typ><nr_drogi>A1</nr_drogi><woj>pomorskie</woj><km>65.150</km><dl>9.830</dl>
+    <geo_lat>53.682945</geo_lat><geo_long>18.633125</geo_long>
+    <nazwa_odcinka>Kopytkowo - Warlubie</nazwa_odcinka>
+    <data_powstania>2026-09-23T00:00:00+0200</data_powstania><data_likwidacji>2026-11-08T23:59:00+0100</data_likwidacji>
+    <objazd>Prace remontowe na nitce prawej (kierunek Łódź). Przełożenie ruchu na przeciwległą jezdnię…</objazd>
+    <rodzaj><poz>U33</poz></rodzaj><ogr_predkosc>50</ogr_predkosc>
+    <ruch_wahadlowy>false</ruch_wahadlowy><sygnalizacja_swietlna>false</sygnalizacja_swietlna><awaria_mostu>false</awaria_mostu>
+    <ruch_2_kierunkowy>false</ruch_2_kierunkowy><droga_zamknieta>false</droga_zamknieta> …</utr>
+```
+Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, U42=63, I04=26, U27=8, R11=2;
+`droga_zamknieta=true` 8, `ruch_wahadlowy=true` 134, `sygnalizacja_swietlna=true` 42, `ruch_2_kierunkowy=true` 29, `awaria_mostu=true` 1;
+33 records **without coordinates**; flag fields missing on the 28 non-U records. Saved trimmed fixture: `ingest/tests/fixtures/gddkia_utrdane.xml`.
+
+### What is NOT documented ❓
+- **No code list** for `typ` / `rodzaj` in the feed or on dane.gov.pl. From samples (inference, not verified): `U` = roadworks (U33 roadworks, U42 lane narrowing, U27 junction/viaduct works), `W` = incident (R11: blocked lane, ~2 h), `I` = other restriction (I04: speed limit after pavement damage, long-running).
+- **Update frequency:** unknown. The file did not change during a 10-minute observation. Polling every 15 min with `If-None-Match` (ETag) costs ~nothing when unchanged.
+- **No stable record ID.**
+- **No line geometry** – only a point (`geo_lat/long`) plus road kilometre `km` and length `dl` (km).
+- **`objazd`** is free text (often a description of the restriction, not a detour).
+
+### Proposed mapping → `events` (needs your decision)
+- `type = road_incident` (new enum value + migration), `source = gddkia` (new enum value).
+- `source_event_id` = hash of `typ|nr_drogi|woj|km|data_powstania|nazwa_odcinka` (2 collisions on the 6-field key `nr_drogi|km|data_powstania|woj` alone). ⚠️ If GDDKiA edits any of these, it becomes a new event (old one is closed as missing) → possible duplicate push for closures.
+- `severity`: `droga_zamknieta` → **3**; `ruch_wahadlowy` / `sygnalizacja_swietlna` / `ruch_2_kierunkowy` / `awaria_mostu` / `typ=W` → **2**; everything else (roadworks, speed limits, narrowing) → **1**. (Matches the brief's examples; 0 unused.)
+- `title` = e.g. „Zamknięcie drogi: A1, Kopytkowo – Warlubie” / „Ruch wahadłowy: DK15 …” / „Roboty drogowe: …”; `description` = `objazd` + limits (`ogr_predkosc`, `ogr_nosnosc`, …) + `km`/`dl`.
+- `valid_from/valid_to` = `data_powstania` / `data_likwidacji` (have explicit offsets).
+- Geometry: **point**; TERYT via `ST_Intersects`. Records without coordinates: assign the whole voivodeship from `woj` (like hydro warnings), or skip them.
+- `source_url`: no per-record link; use https://www.gov.pl/web/gddkia (to verify a better public map link).
+- **License:** CC0 1.0 – no attribution required; we will still credit „Źródło: GDDKiA”.
+
 ## Decisions (accepted 2026-10-15)
 
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
