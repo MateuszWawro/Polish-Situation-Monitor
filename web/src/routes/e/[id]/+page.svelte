@@ -16,6 +16,7 @@
 	} from '#lib/events.ts';
 	import type { PlacesIndex } from '#lib/search.ts';
 	import { shareLink } from '#lib/share.ts';
+	import WaterChart from '#lib/WaterChart.svelte';
 
 	let ev: EventProps | null = $state(null);
 	let area: string[] = $state([]);
@@ -139,6 +140,11 @@
 
 			{#if ev.description}<p class="desc">{ev.description}</p>{/if}
 
+			{#if ev.source_event_id?.startsWith('station:')}
+				<h2 class="chart-title">Stan wody – ostatnie 3 doby</h2>
+				<WaterChart stationId={ev.source_event_id.slice('station:'.length)} />
+			{/if}
+
 			<div class="actions">
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved path + query -->
 				<a class="primary" href={`${resolve('/')}?e=${ev.id}`}>Pokaż na mapie</a>
@@ -229,6 +235,10 @@
 		white-space: pre-line;
 		border-top: 1px solid var(--border);
 		padding-top: 0.75rem;
+	}
+	.chart-title {
+		font-size: 1rem;
+		margin: 1rem 0 0;
 	}
 	.actions {
 		display: flex;

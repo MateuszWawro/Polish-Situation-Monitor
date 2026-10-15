@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { shareLink } from '#lib/share.ts';
+	import WaterChart from '#lib/WaterChart.svelte';
 	import {
 		LAYERS,
 		SEVERITY_COLORS,
@@ -58,6 +59,9 @@
 						<div class="item">
 							<p class="meta">Ważność: {formatRange(ev.valid_from, ev.valid_to)}</p>
 							{#if ev.description}<p class="desc">{ev.description}</p>{/if}
+							{#if ev.source_event_id?.startsWith('station:')}
+								<WaterChart stationId={ev.source_event_id.slice('station:'.length)} />
+							{/if}
 							<p class="meta">
 								Źródło: {sourceLabel(ev.source)}
 								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
