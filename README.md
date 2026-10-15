@@ -1,22 +1,31 @@
 # Polish Situation Monitor
 
 A situational map of Poland built on official open data: weather and hydrological
-warnings, river levels, air quality and fire hotspots, shown per powiat and
-województwo on one map.
+warnings, river levels, air quality, satellite fire hotspots and road incidents,
+shown per powiat and województwo on one map.
 
 Hobby, non-commercial project. MIT licensed. No ads, ever.
 
-> **Status:** early skeleton. The service layout, compose stack and CI are in place;
-> data ingestion, the database schema and the map are not built yet.
+## Features
+
+- **Map** with toggleable layers, a severity filter (0–3), place search and
+  shareable links that keep the view, layers and the open event in the URL.
+- **Moja okolica** – up to 5 saved places with their active warnings. Places and
+  the "use my location" lookup stay on the device; the position is never sent.
+- **Event pages** (`/e/<id>`), including a 72-hour water level chart for gauges
+  above the warning level.
+- **Source status** (`/status`) with last successful fetch and 7-day availability.
+- **Offline fallback** – a service worker shows the last loaded state.
 
 ## Data sources
 
-| Source | Data | Status |
+| Source | Data | Refresh |
 | --- | --- | --- |
-| [IMGW-PIB](https://danepubliczne.imgw.pl/) | meteorological warnings, hydrological warnings, water levels | planned |
-| [GIOŚ](https://powietrze.gios.gov.pl/) | air quality index per station | planned |
-| [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS fire hotspots | planned, needs a free `MAP_KEY` |
-| [GUGiK PRG](https://www.geoportal.gov.pl/) | administrative boundaries (powiaty, województwa) | planned |
+| [IMGW-PIB](https://danepubliczne.imgw.pl/) | meteorological and hydrological warnings, water levels | every 10 min |
+| [GIOŚ](https://powietrze.gios.gov.pl/) | air quality index per station | hourly |
+| [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS fire hotspots (NOAA-20, NOAA-21), public CSV, no key | every 30 min |
+| [GDDKiA](https://dane.gov.pl/pl/dataset/2752) | incidents and roadworks on national roads (CC0) | every 15 min |
+| [GUGiK PRG](https://www.geoportal.gov.pl/) | voivodeship and powiat boundaries | one-off import |
 
 Endpoints, limits, licences and mapping decisions are documented in
 [`docs/SOURCES.md`](docs/SOURCES.md).
@@ -31,20 +40,26 @@ data sources ──► ingest ──► PostgreSQL + PostGIS ──► api ─�
 
 | Directory | What | Stack |
 | --- | --- | --- |
-| `ingest/` | Scheduler with one job per source; a failing source never affects the others | Python 3.12, APScheduler |
-| `api/` | Read API serving normalised events | FastAPI, SQLAlchemy 2, GeoAlchemy2, Redis cache |
+| `ingest/` | Scheduler with one job per source; a failing source never affects the others | Python 3.12, APScheduler, psycopg 3 |
+| `api/` | Read API serving normalised events as GeoJSON | FastAPI, SQLAlchemy 2, GeoAlchemy2, Redis cache |
+| `db/` | Alembic migrations, PRG boundary import, offline place index builder | Alembic, psycopg 3 |
 | `web/` | Map frontend; talks only to `api/`, never to data sources | SvelteKit (adapter-static), MapLibre, TypeScript |
 | `deploy/` | Docker Compose stack | PostgreSQL 18 + PostGIS 3.6, Redis 7.4, Caddy |
-| `docs/` | Source facts, decisions, ADRs | |
+| `docs/` | Source facts and decisions ([`SOURCES.md`](docs/SOURCES.md)), [ADRs](docs/adr/) | |
 
 ## Running locally
 
 Requires Docker with Compose v2.
 
 ```sh
-cp .env.example .env          # fill in values; FIRMS_MAP_KEY is optional for now
+cp .env.example .env          # set a password and INGEST_CONTACT
 docker compose -f deploy/docker-compose.yml up --build
+# once, after the first start: import administrative boundaries from PRG
+docker compose -f deploy/docker-compose.yml run --rm migrate python import_prg.py
 ```
+
+The `migrate` service applies database migrations on every start; `api` and
+`ingest` wait for it.
 
 | Service | URL |
 | --- | --- |
@@ -57,7 +72,7 @@ All ports are bound to localhost only. Every environment variable is listed in
 
 ## Development
 
-Python (`api/`, `ingest/`):
+Python (`api/`, `ingest/`, `db/`):
 
 ```sh
 python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'
@@ -71,7 +86,7 @@ npx npm@11 ci
 npm run lint && npm run check && npm test && npm run build
 ```
 
-CI (GitLab) runs the same lint and test steps, builds all three images and scans
+CI (GitLab) runs the same lint and test steps, builds all four images and scans
 them with Trivy (fails on fixable HIGH/CRITICAL).
 
 ### Conventions
@@ -83,13 +98,16 @@ them with Trivy (fails on fixable HIGH/CRITICAL).
 
 ## Attribution
 
-Required by the data licences and shown on the site:
+Required by the data licences; the site shows the full text and licence links on
+`/zrodla`:
 
 - Źródłem pochodzenia danych jest Instytut Meteorologii i Gospodarki Wodnej – Państwowy Instytut Badawczy.
   Dane Instytutu Meteorologii i Gospodarki Wodnej – Państwowego Instytutu Badawczego zostały przetworzone.
-- Źródło: GIOŚ, portal Jakość Powietrza.
-- Fire data: NASA FIRMS (LANCE).
-- Administrative boundaries: GUGiK, Państwowy Rejestr Granic.
+- Źródło: Główny Inspektorat Ochrony Środowiska, portal „Jakość Powietrza”.
+- NASA FIRMS (NASA LANCE, ESDIS).
+- Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.
+- Źródło: Główny Urząd Geodezji i Kartografii, PRG.
+- Basemap: © OpenStreetMap contributors (ODbL).
 
 The IMGW terms treat websites with advertising as commercial use, which is why
 this project will never carry ads.
