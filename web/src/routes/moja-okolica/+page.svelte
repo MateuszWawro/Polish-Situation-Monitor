@@ -306,7 +306,7 @@
 	}
 	.place {
 		border: 1px solid var(--border);
-		border-radius: 10px;
+		border-radius: var(--radius);
 		padding: 0.75rem 1rem;
 		margin: 1rem 0;
 	}
@@ -350,7 +350,7 @@
 	}
 	.add {
 		border: 1px dashed var(--border);
-		border-radius: 10px;
+		border-radius: var(--radius);
 		padding: 0.75rem 1rem;
 		margin: 1rem 0;
 		display: grid;
@@ -369,7 +369,7 @@
 		padding: 0.6rem 0.7rem;
 		min-height: 44px;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--bg);
 		color: var(--fg);
 	}
@@ -377,7 +377,7 @@
 		font: inherit;
 		min-height: 44px;
 		padding: 0.5rem 1rem;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		border: 1px solid var(--accent);
 		background: var(--accent);
 		color: var(--bg);
@@ -406,7 +406,7 @@
 		margin: 0;
 		padding: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.hits button {
@@ -432,7 +432,7 @@
 		color: var(--warn-fg);
 		background: var(--warn-bg);
 		padding: 0.4rem 0.6rem;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		margin: 0;
 	}
 	.actions {

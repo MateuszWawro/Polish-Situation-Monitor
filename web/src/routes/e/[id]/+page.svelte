@@ -172,7 +172,7 @@
 		gap: 0.5rem;
 		margin: 0;
 		padding: 0.5rem 0.75rem;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		font-weight: 700;
 		background: color-mix(in srgb, var(--sev) 22%, transparent);
 		border-left: 6px solid var(--sev);
@@ -212,7 +212,7 @@
 		display: inline-block;
 		margin-top: 0.25rem;
 		padding: 0.25rem 0.6rem;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		background: var(--warn-bg);
 		color: var(--warn-fg);
 	}
@@ -261,7 +261,7 @@
 	}
 	.actions .primary {
 		padding: 0 1rem;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: var(--accent);
 		color: var(--bg);
 		font-weight: 600;

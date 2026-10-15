@@ -41,7 +41,7 @@
 	<input
 		id="map-search"
 		type="search"
-		placeholder="🔍 Szukaj miejscowości…"
+		placeholder="Szukaj miejscowości…"
 		autocomplete="off"
 		role="combobox"
 		aria-expanded={open && hits.length > 0}
@@ -82,8 +82,8 @@
 		padding: 0.45rem 0.7rem;
 		font: inherit;
 		border: 1px solid var(--border);
-		border-radius: 8px;
-		background: var(--bg);
+		border-radius: var(--radius);
+		background: var(--panel-solid);
 		color: var(--fg);
 	}
 	ul {
@@ -91,9 +91,9 @@
 		margin: 0.25rem 0 0;
 		padding: 0;
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		overflow: hidden;
-		background: var(--bg);
+		background: var(--panel-solid);
 	}
 	li + li {
 		border-top: 1px solid var(--border);
