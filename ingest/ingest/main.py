@@ -10,11 +10,20 @@ import psycopg
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from ingest.base import Worker
+from ingest.firms import FirmsWorker
+from ingest.gios import GiosWorker
+from ingest.imgw_hydro import ImgwHydroStationsWorker, ImgwHydroWarningsWorker
 from ingest.imgw_meteo import ImgwMeteoWorker
 
 log = logging.getLogger("ingest")
 
-WORKERS: list[Worker[Any]] = [ImgwMeteoWorker()]
+WORKERS: list[Worker[Any]] = [
+    ImgwMeteoWorker(),
+    ImgwHydroWarningsWorker(),
+    ImgwHydroStationsWorker(),
+    GiosWorker(),
+    FirmsWorker(),
+]
 
 RAW_RETENTION_SQL = (
     "UPDATE events SET raw = NULL WHERE raw IS NOT NULL AND fetched_at < now() - interval '7 days'"
@@ -49,7 +58,7 @@ def build_scheduler() -> BlockingScheduler:
             run_worker,
             "interval",
             args=[worker],
-            id=worker.source,
+            id=f"{worker.source}{worker.id_prefix}",
             seconds=worker.interval_s,
             next_run_time=datetime.now(UTC),
         )

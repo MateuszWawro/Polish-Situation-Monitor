@@ -55,12 +55,17 @@ Verified with real requests on **2026-10-15**. Status legend: ✅ verified · �
 - **Mapping:** `source_event_id=stationId`, `type=air_quality`, geom=station point, TERYT via `ST_Intersects`, `valid_from` = source data hour. **Decision needed:** index is 0–5 (Bardzo dobry…Bardzo zły), severity is 0–3. Proposal: 0–1→0, 2→1, 3→2, 4–5→3. Index `-1`/null = no data → skip.
 - **License ✅/⚠️:** using the API = accepting the portal Regulamin; must "clearly indicate the source". Exact regulamin URL not yet confirmed (link on the API page). Proposed attribution: „Źródło: GIOŚ, portal Jakość Powietrza”. Data is unverified (may change later).
 
-## 4. NASA FIRMS – fire hotspots ⚠️ (needs your MAP_KEY)
+## 4. NASA FIRMS – fire hotspots ✅ (no key needed)
 
-- **Endpoint:** `GET https://firms.modaps.eosdis.nasa.gov/api/area/csv/{MAP_KEY}/{SOURCE}/14.07,49.00,24.15,54.84/1` (bbox west,south,east,north; day range 1–5). Sources: `VIIRS_SNPP_NRT`, `VIIRS_NOAA20_NRT`, `VIIRS_NOAA21_NRT`, `MODIS_NRT`.
-- With invalid key: `Invalid MAP_KEY.` → **real response/sample row not yet verified.** Free key: https://firms.modaps.eosdis.nasa.gov/api/map_key/
-- **Limits ❓:** per-key "transactions" quota, checkable at `/mapserver/mapkey_status/?MAP_KEY=…`; the value was not visible without a key. Plan: every 30 min × 3 VIIRS sources.
-- **Mapping (from documented attribute tables, to verify on a real row):** `source_event_id = satellite+acq_date+acq_time+lat+lon`, `type=fire_hotspot`, geom=point, severity from `confidence` (VIIRS: l/n/h → 1/2/3), `valid_from`=acq time (UTC), `valid_to`=+24 h. TERYT via `ST_Intersects`. Bbox includes neighbours → drop points outside Poland.
+- **Used:** public, key-less 24 h Europe CSV files, verified 2026-10-15 (≈80 KB each, same columns as the MAP_KEY area API):
+  - `https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Europe_24h.csv`
+  - `https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-21-viirs-c2/csv/J2_VIIRS_C2_Europe_24h.csv`
+- **Suomi NPP deliveries end 2026-11-02** (banner on earthdata.nasa.gov) → only NOAA-20/NOAA-21.
+- **Columns:** `latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight`
+  Sample: `52.58381,19.66626,295.24,0.58,0.52,2026-10-14,0009,N20,nominal,2.0NRT,277.14,1.35,N`
+- `confidence` ∈ `low/nominal/high` → severity 1/2/3. `acq_time` = HHMM UTC.
+- **Mapping:** `source_event_id = satellite:acq_date:acq_time:lat:lon`, geom = point, `valid_to = acq + 24 h`, TERYT via `ST_Intersects`; points outside Polish powiaty are dropped (bbox pre-filter in Python).
+- Poll every 30 min (2 requests). The MAP_KEY area API remains an option if the public files disappear.
 - **License ✅:** NASA full and open data sharing, no restrictions; cite as "NASA FIRMS" (FAQ: https://www.earthdata.nasa.gov/data/tools/firms/faq) + LANCE disclaimer.
 
 ## 5. GUGiK PRG – administrative boundaries ✅ / license ⚠️
@@ -77,5 +82,5 @@ Verified with real requests on **2026-10-15**. Status legend: ✅ verified · �
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
 2. **Water levels** → only stations at/above `stan_ostrzegawczy` are stored, as `hydro_warning` (severity 2 ≥ warning, 3 ≥ alarm). No new event type.
 3. **GIOŚ index → severity:** 0–1→0, 2→1, 3→2, 4–5→3; `-1`/null skipped.
-4. **FIRMS:** worker built against documented CSV format; verify with a real MAP_KEY once provided.
+4. **FIRMS:** uses the public key-less Europe CSV files (found during step 4) – no MAP_KEY needed.
 5. **PRG license** and exact **GIOŚ regulamin URL** still to confirm before prod.
