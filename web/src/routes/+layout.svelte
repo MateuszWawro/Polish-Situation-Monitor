@@ -9,6 +9,7 @@
 
 	const links = [
 		{ path: '/', label: 'Mapa' },
+		{ path: '/moja-okolica', label: 'Moja okolica' },
 		{ path: '/zrodla', label: 'Źródła' },
 		{ path: '/o-projekcie', label: 'O projekcie' }
 	] as const;
@@ -62,7 +63,7 @@
 		display: flex;
 		gap: 0.25rem;
 	}
-	@media (max-width: 420px) {
+	@media (max-width: 560px) {
 		.wide {
 			display: none;
 		}
@@ -78,5 +79,19 @@
 	nav a[aria-current='page'] {
 		background: color-mix(in srgb, var(--accent) 15%, transparent);
 		color: var(--accent);
+	}
+	/* Phones: four links need the whole width; "Mapa" already leads home. */
+	@media (max-width: 440px) {
+		.brand {
+			display: none;
+		}
+		nav {
+			width: 100%;
+			justify-content: space-between;
+		}
+		nav a {
+			padding: 0.5rem 0.35rem;
+			font-size: 0.9rem;
+		}
 	}
 </style>

@@ -18,6 +18,8 @@ Talk to the owner in Polish; code, names, comments and commits in English.
 - Small conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`).
 - Ask the owner when something needs a decision. Server commands run as root: no `sudo`.
 - No ads on the site, ever (IMGW terms treat ad-bearing sites as commercial use).
+- Privacy: the user's location and place names never leave the device (powiat lookup and
+  places storage are client-side, see ADR 0002). The server only ever sees powiat codes.
 
 ## Commands
 - Python (`api/`, `ingest/`, `db/`): `python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'`,
@@ -28,7 +30,9 @@ Talk to the owner in Polish; code, names, comments and commits in English.
 
 - Migrations: `cd db && DATABASE_URL=... alembic upgrade head` (hand-written SQL, no autogenerate)
 - Boundaries: `cd db && DATABASE_URL=... python import_prg.py` (~1 min, re-runnable)
-- DB-backed API tests run only when `DATABASE_URL` is set (skipped in CI for now)
+- Place search index: `cd db && python build_places_index.py ../web/static/places-index.json` (re-run when PRG changes)
+- DB-backed API tests run only when `DATABASE_URL` is set (skipped in CI for now).
+  Ingest DB tests wipe events of the sources they test – re-run the workers afterwards on a dev DB.
 
 ## Gotchas
 - Repo lives on exFAT: macOS creates `._*` files. They are git/prettier/docker-ignored; delete before tooling if something chokes
