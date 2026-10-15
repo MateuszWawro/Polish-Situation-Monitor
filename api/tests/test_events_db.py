@@ -164,3 +164,25 @@ def test_admin_bboxes() -> None:
     assert len(body) >= 370
     west, south, east, north = body["1861"]  # Krosno
     assert 21.6 < west < east < 21.9 and 49.6 < south < north < 49.8
+
+
+def test_aircraft_hides_stale_positions() -> None:
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM aircraft"))
+        conn.execute(
+            text("""
+            INSERT INTO aircraft (hex, class, callsign, geom, seen_at) VALUES
+              ('fresh', 'military', 'PLF693', ST_SetSRID(ST_MakePoint(21, 52.2), 4326), now()),
+              ('stale', 'private', NULL, ST_SetSRID(ST_MakePoint(19, 50), 4326),
+               now() - interval '10 minutes')
+        """)
+        )
+    try:
+        body = client.get("/api/aircraft").json()
+        assert [f["id"] for f in body["features"]] == ["fresh"]
+        props = body["features"][0]["properties"]
+        assert props["class"] == "military" and props["callsign"] == "PLF693"
+        assert body["features"][0]["geometry"]["coordinates"] == [21, 52.2]
+    finally:
+        with get_engine().begin() as conn:
+            conn.execute(text("DELETE FROM aircraft"))

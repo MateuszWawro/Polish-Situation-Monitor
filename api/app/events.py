@@ -158,3 +158,20 @@ ADMIN_UNITS_SQL = text("""
     FROM admin_units
     WHERE CAST(:level AS text) IS NULL OR level = :level
 """)
+
+# Map layer: latest adsb.lol snapshot. Positions older than 5 min (ingest down) are hidden.
+AIRCRAFT_TTL_S = 30
+AIRCRAFT_SQL = text("""
+    SELECT json_build_object('type', 'FeatureCollection', 'features', coalesce(json_agg(
+        json_build_object(
+            'type', 'Feature', 'id', hex,
+            'geometry', ST_AsGeoJSON(geom, 4)::json,
+            'properties', json_build_object(
+                'hex', hex, 'class', class, 'callsign', callsign,
+                'registration', registration, 'aircraft_type', aircraft_type,
+                'altitude_ft', altitude_ft, 'speed_kt', speed_kt, 'track', track,
+                'seen_at', seen_at)
+        ) ORDER BY hex), '[]'::json))::text
+    FROM aircraft
+    WHERE seen_at > now() - interval '5 minutes'
+""")
