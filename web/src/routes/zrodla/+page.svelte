@@ -44,6 +44,16 @@
 				'Stopnie: zamknięcie drogi → 3, ruch wahadłowy / sygnalizacja / ruch dwukierunkowy na jednej jezdni / awaria mostu / zdarzenie → 2, roboty i ograniczenia → 1. „Zamknięcie” pochodzi z flagi źródła i może dotyczyć tylko jednej jezdni lub części pojazdów.'
 		},
 		{
+			anchor: 'adsb',
+			name: 'adsb.lol – dane ADS-B samolotów (zakłócenia GPS)',
+			url: 'https://adsb.lol/',
+			terms: 'https://opendatacommons.org/licenses/odbl/1-0/',
+			termsLabel: 'Licencja ODbL 1.0',
+			attribution: ['Dane lotnicze: adsb.lol (społecznościowa sieć odbiorników ADS-B), ODbL 1.0.'],
+			notes:
+				'Jedyne nieoficjalne źródło na mapie. Samoloty nadają, jak dokładna jest ich pozycja GPS (NACp). Liczymy, jaki odsetek samolotów w kwadracie ok. 55 × 50 km zgłaszał w ostatniej godzinie obniżoną dokładność (NACp < 8), metodą serwisu gpsjam.org: co najmniej 8 samolotów, wynik (złe − 1) / wszystkie. 2–10% → stopień 1, 10–30% → 2, od 30% → 3. To szacunek: wskazuje prawdopodobne zakłócenia, ale ich nie potwierdza – niską dokładność mogą też zgłaszać pojedyncze samoloty z powodu awarii lub starszego sprzętu. Brak kwadratu oznacza brak zakłóceń albo za mało samolotów.'
+		},
+		{
 			anchor: 'prg',
 			name: 'GUGiK – Państwowy Rejestr Granic (granice województw i powiatów)',
 			url: 'https://www.geoportal.gov.pl/',
@@ -70,7 +80,7 @@
 	<h1>Źródła danych i licencje</h1>
 	<p>
 		Aplikacja pobiera dane wyłącznie na swoim serwerze – Twoja przeglądarka nie łączy się
-		bezpośrednio ze źródłami. Wszystkie dane są publiczne i wykorzystywane w celach niekomercyjnych.
+		bezpośrednio ze źródłami. Wszystkie dane są otwarte i wykorzystywane w celach niekomercyjnych.
 	</p>
 
 	{#each sources as source (source.name)}

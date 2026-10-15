@@ -2,7 +2,8 @@
 
 A situational map of Poland built on official open data: weather and hydrological
 warnings, river levels, air quality, satellite fire hotspots and road incidents,
-shown per powiat and województwo on one map.
+shown per powiat and województwo on one map. One layer, possible GPS interference,
+is an estimate from community ADS-B data (see below).
 
 Hobby, non-commercial project. MIT licensed. No ads, ever.
 
@@ -26,6 +27,7 @@ Hobby, non-commercial project. MIT licensed. No ads, ever.
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS fire hotspots (NOAA-20, NOAA-21), public CSV, no key | every 30 min |
 | [GDDKiA](https://dane.gov.pl/pl/dataset/2752) | incidents and roadworks on national roads (CC0) | every 15 min |
 | [GUGiK PRG](https://www.geoportal.gov.pl/) | voivodeship and powiat boundaries | one-off import |
+| [adsb.lol](https://adsb.lol/) | aircraft ADS-B positions → possible GPS interference estimate (ODbL, **unofficial**) | every 2 min |
 
 Endpoints, limits, licences and mapping decisions are documented in
 [`docs/SOURCES.md`](docs/SOURCES.md).
@@ -107,6 +109,7 @@ Required by the data licences; the site shows the full text and licence links on
 - NASA FIRMS (NASA LANCE, ESDIS).
 - Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.
 - Źródło: Główny Urząd Geodezji i Kartografii, PRG.
+- Dane lotnicze: adsb.lol (społecznościowa sieć odbiorników ADS-B), ODbL 1.0.
 - Basemap: © OpenStreetMap contributors (ODbL).
 
 The IMGW terms treat websites with advertising as commercial use, which is why

@@ -9,6 +9,7 @@ import httpx
 import psycopg
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from ingest.adsb_gps import AdsbGpsWorker
 from ingest.base import Worker
 from ingest.firms import FirmsWorker
 from ingest.gddkia import GddkiaWorker
@@ -25,6 +26,7 @@ WORKERS: list[Worker[Any]] = [
     GiosWorker(),
     FirmsWorker(),
     GddkiaWorker(),
+    AdsbGpsWorker(),
 ]
 
 RETENTION_SQL = [

@@ -136,6 +136,22 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 - `https://hydro-back.imgw.pl/station/hydro/status?id=…` (backend of the hydro.imgw.pl map) has series, but it is **not covered by the IMGW data terms** (they name danepubliczne.imgw.pl and meteo.imgw.pl) → not used.
 - **Decision:** keep our own history – the stations worker already reads all 913 stations every 10 min; each new measurement is stored in `water_levels` (7-day retention). Charts start filling from deployment; no backfill.
 
+## 9. adsb.lol – GPS interference estimate from ADS-B ⚠️ (2026-10-15, unofficial source)
+
+- **No official source exists** for GNSS interference over Poland. Accepted by the owner as the **only non-official source** on the map, labelled as an estimate.
+- **Endpoint:** `GET https://api.adsb.lol/v2/point/51.9/19.3/250` → `200`, JSON `{"ac": [...], "now": ms, "total": n}`, `cache-control: no-store`. One circle (250 NM = API max, 463 km) covers all of Poland; the farthest corner (Bieszczady) is ~420 km from the centre. ~200 aircraft at 19:20 local time, ~110 usable.
+- **Auth / limits:** no key, no rate-limit headers, none documented ("The API is available to everyone"). Plan: one request every 2 min. Occasional dropped connections seen → covered by the worker's retry.
+- **License ✅:** ODbL 1.0 (https://www.adsb.lol/docs/open-data/api/). Attribution: „adsb.lol, ODbL 1.0”.
+- **Fields used:** `hex`, `lat`, `lon`, `nac_p` (Navigation Accuracy Category – Position), `version` (ADS-B version), `alt_baro` (`"ground"` on the ground), `seen_pos`, `mlat`/`tisb` (lists of fields derived on the ground).
+- **Method** (gpsjam.org's, over a rolling 60-minute window instead of 24 h):
+  - aircraft counted only with ADS-B v2, airborne, position ≤ 60 s old, position not from MLAT/TIS-B;
+  - degraded = `nac_p < 8` (estimated position error ≥ 93 m; airliners normally report 9–11);
+  - grid 0.5° lat × 0.75° lon (~55 × 50 km), distinct aircraft per cell in the window; an aircraft is degraded if any of its reports in that cell was;
+  - share = `100 × (degraded − 1) / all` (one aircraft alone never counts), only cells with ≥ 8 aircraft;
+  - severity: 2–10 % → 1, 10–30 % → 2, ≥ 30 % → 3 (gpsjam.org uses 2 % and 10 % for yellow/red; the 30 % step is ours).
+- **Mapping → `events`:** `source=adsb_lol`, `type=gps_interference`, `source_event_id = row:col` of the cell, geom = cell polygon, TERYT via `ST_Intersects` (cells entirely outside Poland, e.g. over Kaliningrad, are dropped), `valid_from` = when the cell first crossed the threshold, `valid_to` open; the cell is closed when it drops below.
+- **Limits of the estimate:** low NACp can also come from a faulty or old transponder; few aircraft at night → fewer cells; the window is kept in memory, so after an ingest restart it takes up to an hour to fill again.
+
 ## Decisions (accepted 2026-10-15)
 
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
@@ -144,3 +160,4 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 4. **FIRMS:** uses the public key-less Europe CSV files (found during step 4) – no MAP_KEY needed.
 5. **PRG license** and exact **GIOŚ regulamin URL** still to confirm before prod.
 6. **GDDKiA** (accepted 2026-10-15): open XML feed, mapping as proposed in §6. **Records without coordinates are skipped** (changed 2026-10-15): the first choice – assigning them to the whole voivodeship – made 28 incidents show up in 724 powiaty, e.g. S19 roadworks near Dukla listed for the city of Krosno in „Moja okolica”. ~5% of records (33 of 550 on 2026-10-15) are lost; they reappear automatically once GDDKiA adds coordinates. Poll every 15 min, full download (no ETag shortcut: an unchanged-file response would otherwise close all incidents as missing). Note: the source's `droga_zamknieta` flag is also set for partial closures (one carriageway / heavy vehicles only).
+7. **GPS interference** (accepted 2026-10-15): adsb.lol (ODbL) as the one non-official source, method as in §9, layer labelled as an estimate on the map and on `/zrodla`.

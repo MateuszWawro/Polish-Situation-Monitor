@@ -5,7 +5,12 @@ from typing import Literal, get_args
 from sqlalchemy import text
 
 EventType = Literal[
-    "weather_warning", "hydro_warning", "air_quality", "fire_hotspot", "road_incident"
+    "weather_warning",
+    "hydro_warning",
+    "air_quality",
+    "fire_hotspot",
+    "road_incident",
+    "gps_interference",
 ]
 EVENT_TYPES: tuple[str, ...] = get_args(EventType)
 
@@ -16,6 +21,7 @@ CACHE_TTL_S = {
     "air_quality": 300,
     "fire_hotspot": 300,
     "road_incident": 300,
+    "gps_interference": 60,
 }
 MAX_FEATURES = 5000
 

@@ -13,6 +13,7 @@ from app.main import app
 
 pytestmark = pytest.mark.skipif("DATABASE_URL" not in os.environ, reason="needs PostGIS")
 client = TestClient(app)
+SOURCES = {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia", "adsb_lol"}
 
 INSERT = text("""
     INSERT INTO events (source, source_event_id, type, severity, title, geom, teryt_powiat,
@@ -92,7 +93,7 @@ def test_sources_status_lists_all_sources() -> None:
         )
     try:
         status = {s["source"]: s for s in client.get("/api/sources/status").json()}
-        assert set(status) == {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia"}
+        assert set(status) == SOURCES
         assert status["imgw_meteo"]["stale"] is True  # 31 min > 3 × 10 min
         assert status["imgw_meteo"]["age_s"] >= 31 * 60
     finally:
@@ -127,7 +128,7 @@ def test_areas_summary(events: dict[str, uuid.UUID]) -> None:
 
 def test_sources_history_has_7_days_per_source() -> None:
     body = client.get("/api/sources/history").json()
-    assert {s["source"] for s in body} == {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia"}
+    assert {s["source"] for s in body} == SOURCES
     for s in body:
         assert len(s["days"]) == 7
         assert all(0 <= d["ok"] <= d["attempts"] for d in s["days"])
