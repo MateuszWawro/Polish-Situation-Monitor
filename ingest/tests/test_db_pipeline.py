@@ -9,6 +9,7 @@ import psycopg
 import pytest
 import respx
 
+from ingest.adsb_gps import AdsbGpsWorker
 from ingest.firms import FirmsWorker
 from ingest.imgw_hydro import ImgwHydroWarningsWorker
 from ingest.imgw_meteo import ImgwMeteoWorker
@@ -166,3 +167,34 @@ def test_runs_are_logged_and_station_history_kept(conn: psycopg.Connection) -> N
     finally:
         conn.execute("DELETE FROM water_levels WHERE station_id LIKE 'test%'")
         conn.execute("DELETE FROM hydro_stations WHERE station_id LIKE 'test%'")
+
+
+def test_gps_interference_cells_in_poland_only(conn: psycopg.Connection) -> None:
+    conn.execute("DELETE FROM events WHERE source = 'adsb_lol'")
+    worker = AdsbGpsWorker(sleep=lambda _: None)
+
+    def ac(prefix: str, lat: float, lon: float, nac_p: int, n: int) -> list[dict[str, Any]]:
+        return [{"hex": f"{prefix}{i}", "lat": lat, "lon": lon, "nac_p": nac_p, "version": 2,
+                 "alt_baro": 35000} for i in range(n)]  # fmt: skip
+
+    def run_adsb(aircraft: list[dict[str, Any]]) -> None:
+        with respx.mock, httpx.Client() as client:
+            respx.get(worker.url).mock(return_value=httpx.Response(200, json={"ac": aircraft}))
+            worker.run(conn, client)
+
+    # Białystok (in Poland) and a cell entirely over Kaliningrad, both 40 % degraded.
+    run_adsb(ac("b", 53.1, 23.2, 0, 5) + ac("g", 53.1, 23.2, 10, 5)
+             + ac("k", 54.8, 20.5, 0, 5) + ac("n", 54.8, 20.5, 10, 5))  # fmt: skip
+    found = conn.execute(
+        "SELECT source_event_id, severity, valid_to IS NULL, '2061' = ANY(teryt_powiat)"
+        " FROM events WHERE source = 'adsb_lol'"
+    ).fetchall()
+    assert found == [("106:30", 3, True, True)]  # Białystok city powiat; Kaliningrad dropped
+
+    worker.window.clear()
+    run_adsb(ac("g", 53.1, 23.2, 10, 10))
+    closed = conn.execute(
+        "SELECT valid_to <= now() FROM events WHERE source = 'adsb_lol'"
+    ).fetchone()
+    assert closed == (True,)
+    conn.execute("DELETE FROM events WHERE source = 'adsb_lol'")
