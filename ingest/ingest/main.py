@@ -11,6 +11,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from ingest.base import Worker
 from ingest.firms import FirmsWorker
+from ingest.gddkia import GddkiaWorker
 from ingest.gios import GiosWorker
 from ingest.imgw_hydro import ImgwHydroStationsWorker, ImgwHydroWarningsWorker
 from ingest.imgw_meteo import ImgwMeteoWorker
@@ -23,6 +24,7 @@ WORKERS: list[Worker[Any]] = [
     ImgwHydroStationsWorker(),
     GiosWorker(),
     FirmsWorker(),
+    GddkiaWorker(),
 ]
 
 RAW_RETENTION_SQL = (

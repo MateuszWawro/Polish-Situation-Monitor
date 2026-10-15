@@ -4,11 +4,19 @@ from typing import Literal, get_args
 
 from sqlalchemy import text
 
-EventType = Literal["weather_warning", "hydro_warning", "air_quality", "fire_hotspot"]
+EventType = Literal[
+    "weather_warning", "hydro_warning", "air_quality", "fire_hotspot", "road_incident"
+]
 EVENT_TYPES: tuple[str, ...] = get_args(EventType)
 
 # Cache TTL per type: well below each source's polling interval (docs/SOURCES.md).
-CACHE_TTL_S = {"weather_warning": 60, "hydro_warning": 60, "air_quality": 300, "fire_hotspot": 300}
+CACHE_TTL_S = {
+    "weather_warning": 60,
+    "hydro_warning": 60,
+    "air_quality": 300,
+    "fire_hotspot": 300,
+    "road_incident": 300,
+}
 MAX_FEATURES = 5000
 
 PROPERTIES = """

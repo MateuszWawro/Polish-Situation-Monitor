@@ -85,7 +85,7 @@ def test_sources_status_lists_all_sources() -> None:
         """)
         )
     status = {s["source"]: s for s in client.get("/api/sources/status").json()}
-    assert set(status) == {"imgw_meteo", "imgw_hydro", "gios", "firms"}
+    assert set(status) == {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia"}
     assert status["imgw_meteo"]["stale"] is True  # 31 min > 3 × 10 min
     assert status["imgw_meteo"]["age_s"] >= 31 * 60
 
