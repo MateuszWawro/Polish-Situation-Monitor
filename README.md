@@ -22,7 +22,7 @@ Hobby, non-commercial project. MIT licensed. No ads, ever.
 | Source | Data | Refresh |
 | --- | --- | --- |
 | [IMGW-PIB](https://danepubliczne.imgw.pl/) | meteorological and hydrological warnings, water levels | every 10 min |
-| [GIOŚ](https://powietrze.gios.gov.pl/) | air quality index per station | hourly |
+| [GIOŚ](https://powietrze.gios.gov.pl/) | air quality index per station | every 30 min |
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS fire hotspots (NOAA-20, NOAA-21), public CSV, no key | every 30 min |
 | [GDDKiA](https://dane.gov.pl/pl/dataset/2752) | incidents and roadworks on national roads (CC0) | every 15 min |
 | [GUGiK PRG](https://www.geoportal.gov.pl/) | voivodeship and powiat boundaries | one-off import |
