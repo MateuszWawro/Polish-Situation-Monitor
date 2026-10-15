@@ -7,7 +7,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -98,6 +98,11 @@ INSERT INTO source_status (source, last_success_at, expected_interval_s)
 VALUES (%(source)s, now(), %(interval)s)
 ON CONFLICT (source) DO UPDATE SET last_success_at = now(),
     expected_interval_s = EXCLUDED.expected_interval_s
+"""
+
+ATTEMPT_SQL = """
+INSERT INTO fetch_attempts (source, worker, started_at, duration_ms, ok, items, error)
+VALUES (%(source)s, %(worker)s, %(started_at)s, %(ms)s, %(ok)s, %(items)s, %(error)s)
 """
 
 STATUS_ERROR_SQL = """
@@ -191,20 +196,35 @@ class Worker[T: BaseModel](ABC):
                 },
             )
 
+    def store_items(self, conn: psycopg.Connection, items: list[T]) -> None:
+        """Hook for workers that keep more than events (e.g. water level history)."""
+        return None  # default: nothing extra to store
+
     def run(self, conn: psycopg.Connection, client: httpx.Client) -> int:
         """One full cycle. Never raises: errors are logged and recorded in source_status."""
         params = {"source": self.source, "interval": self.interval_s}
+        started, clock = datetime.now(UTC), time.monotonic()
+        attempt = {"source": self.source, "worker": type(self).__name__, "started_at": started}
         try:
-            events = [e for i in self.validate(self.fetch(client)) if (e := self.normalize(i))]
+            items = self.validate(self.fetch(client))
+            events = [e for i in items if (e := self.normalize(i))]
             with conn.transaction():
+                self.store_items(conn, items)
                 self.upsert(conn, events)
                 conn.execute(STATUS_SUCCESS_SQL, params)
+                conn.execute(ATTEMPT_SQL, {**attempt, "ok": True, "items": len(events),
+                                           "error": None, "ms": _ms_since(clock)})  # fmt: skip
             log.info("%s: %d events", self.source, len(events))
             return len(events)
         except Exception as exc:
             log.exception("%s: run failed", self.source)
+            error = f"{type(exc).__name__}: {exc}"[:1000]
             with conn.transaction():
-                conn.execute(
-                    STATUS_ERROR_SQL, {**params, "error": f"{type(exc).__name__}: {exc}"[:1000]}
-                )
+                conn.execute(STATUS_ERROR_SQL, {**params, "error": error})
+                conn.execute(ATTEMPT_SQL, {**attempt, "ok": False, "items": None,
+                                           "error": error, "ms": _ms_since(clock)})  # fmt: skip
             return -1
+
+
+def _ms_since(clock: float) -> int:
+    return round((time.monotonic() - clock) * 1000)

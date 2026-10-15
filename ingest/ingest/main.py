@@ -27,9 +27,11 @@ WORKERS: list[Worker[Any]] = [
     GddkiaWorker(),
 ]
 
-RAW_RETENTION_SQL = (
-    "UPDATE events SET raw = NULL WHERE raw IS NOT NULL AND fetched_at < now() - interval '7 days'"
-)
+RETENTION_SQL = [
+    "UPDATE events SET raw = NULL WHERE raw IS NOT NULL AND fetched_at < now() - interval '7 days'",
+    "DELETE FROM water_levels WHERE measured_at < now() - interval '7 days'",
+    "DELETE FROM fetch_attempts WHERE started_at < now() - interval '30 days'",
+]
 
 
 def dsn() -> str:
@@ -45,9 +47,10 @@ def run_worker(worker: Worker[Any]) -> None:
         log.exception("%s: could not start run", worker.source)
 
 
-def purge_raw() -> None:
+def purge_old() -> None:
     with psycopg.connect(dsn(), autocommit=True) as conn:
-        conn.execute(RAW_RETENTION_SQL)
+        for sql in RETENTION_SQL:
+            conn.execute(sql)
 
 
 def build_scheduler() -> BlockingScheduler:
@@ -64,7 +67,7 @@ def build_scheduler() -> BlockingScheduler:
             seconds=worker.interval_s,
             next_run_time=datetime.now(UTC),
         )
-    scheduler.add_job(purge_raw, "interval", id="purge_raw", hours=6)
+    scheduler.add_job(purge_old, "interval", id="purge_old", hours=6)
     return scheduler
 
 

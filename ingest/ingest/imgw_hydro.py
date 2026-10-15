@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 
+import psycopg
 from pydantic import BaseModel, Field
 
 from ingest.base import Event, Worker
@@ -85,6 +86,18 @@ class HydroStation(BaseModel):
 
 MAX_MEASUREMENT_AGE = timedelta(hours=24)
 
+STATION_SQL = """
+INSERT INTO hydro_stations (station_id, name, river, warning_cm, alarm_cm, updated_at)
+VALUES (%(id)s, %(name)s, %(river)s, %(warning)s, %(alarm)s, now())
+ON CONFLICT (station_id) DO UPDATE SET name = EXCLUDED.name, river = EXCLUDED.river,
+    warning_cm = EXCLUDED.warning_cm, alarm_cm = EXCLUDED.alarm_cm, updated_at = now()
+"""
+# Gauges report every 10 min to 1 h; the same reading is fetched several times → ignore repeats.
+LEVEL_SQL = """
+INSERT INTO water_levels (station_id, measured_at, level_cm) VALUES (%(id)s, %(at)s, %(cm)s)
+ON CONFLICT DO NOTHING
+"""
+
 
 class ImgwHydroStationsWorker(Worker[HydroStation]):
     """Only stations at/above warning level become events (decision 2026-10-15)."""
@@ -94,6 +107,20 @@ class ImgwHydroStationsWorker(Worker[HydroStation]):
     url = "https://danepubliczne.imgw.pl/api/data/hydro"
     interval_s = 600
     model = HydroStation
+
+    def store_items(self, conn: psycopg.Connection, items: list[HydroStation]) -> None:
+        """Keep every gauge's readings: the official API has no history (docs/SOURCES.md §8)."""
+        with conn.cursor() as cur:
+            cur.executemany(STATION_SQL, [
+                {"id": s.id_stacji, "name": s.stacja, "river": s.rzeka,
+                 "warning": s.stan_ostrzegawczy, "alarm": s.stan_alarmowy}
+                for s in items
+            ])  # fmt: skip
+            cur.executemany(LEVEL_SQL, [
+                {"id": s.id_stacji, "at": local(s.stan_wody_data_pomiaru), "cm": s.stan_wody}
+                for s in items
+                if s.stan_wody is not None and s.stan_wody_data_pomiaru is not None
+            ])  # fmt: skip
 
     def normalize(self, item: HydroStation) -> Event | None:
         level, warning, alarm = item.stan_wody, item.stan_ostrzegawczy, item.stan_alarmowy

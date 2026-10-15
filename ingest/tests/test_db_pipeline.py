@@ -124,3 +124,39 @@ def test_voivodeship_codes_expand_and_outside_poland_skipped(conn: psycopg.Conne
         assert by_source["firms"] == ["1661"]  # city of Opole
     finally:
         conn.execute("DELETE FROM events WHERE source IN ('imgw_hydro', 'firms')")
+
+
+def test_runs_are_logged_and_station_history_kept(conn: psycopg.Connection) -> None:
+    from datetime import datetime
+
+    from ingest.imgw_hydro import ImgwHydroStationsWorker
+    from ingest.imgw_meteo import WARSAW
+
+    conn.execute("DELETE FROM water_levels WHERE station_id LIKE 'test%'")
+    conn.execute("DELETE FROM hydro_stations WHERE station_id LIKE 'test%'")
+    worker = ImgwHydroStationsWorker(sleep=lambda _: None)
+    now = datetime.now(WARSAW).strftime("%Y-%m-%d %H:%M:00")
+    station = {"id_stacji": "test1", "stacja": "Testowa", "rzeka": "Wisła", "lat": "52.2",
+               "lon": "21.0", "stan_wody": "120", "stan_wody_data_pomiaru": now,
+               "stan_ostrzegawczy": "300", "stan_alarmowy": "400"}  # fmt: skip
+    try:
+        with respx.mock, httpx.Client() as client:
+            respx.get(worker.url).mock(return_value=httpx.Response(200, json=[station]))
+            worker.run(conn, client)
+            worker.run(conn, client)  # same reading again → stored once
+        levels = conn.execute(
+            "SELECT level_cm FROM water_levels WHERE station_id = 'test1'"
+        ).fetchall()
+        assert levels == [(120.0,)]
+        meta = conn.execute(
+            "SELECT warning_cm, alarm_cm FROM hydro_stations WHERE station_id = 'test1'"
+        ).fetchone()
+        assert meta == (300.0, 400.0)
+        attempts = conn.execute(
+            "SELECT ok, items FROM fetch_attempts WHERE worker = 'ImgwHydroStationsWorker'"
+            " ORDER BY id DESC LIMIT 2"
+        ).fetchall()
+        assert attempts == [(True, 0), (True, 0)]  # below warning level → no events
+    finally:
+        conn.execute("DELETE FROM water_levels WHERE station_id LIKE 'test%'")
+        conn.execute("DELETE FROM hydro_stations WHERE station_id LIKE 'test%'")
