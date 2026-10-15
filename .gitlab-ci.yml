@@ -1,0 +1,65 @@
+stages: [lint, test, build, scan]
+
+.python:
+  image: python:3.12.15-slim-bookworm
+  before_script:
+    - cd $SERVICE && pip install -q -e '.[dev]'
+  parallel:
+    matrix:
+      - SERVICE: [api, ingest]
+
+python-lint:
+  extends: .python
+  stage: lint
+  script:
+    - ruff check . && ruff format --check . && mypy .
+
+python-test:
+  extends: .python
+  stage: test
+  script: [pytest -q]
+
+.web:
+  image: node:24.22.0-alpine
+  before_script:
+    - cd web && npm ci --no-audit --no-fund
+
+web-lint:
+  extends: .web
+  stage: lint
+  script: [npm run lint, npm run check]
+
+web-test:
+  extends: .web
+  stage: test
+  script: [npm test, npm run build]
+
+images:
+  stage: build
+  image: docker:29.9.0
+  services: [docker:29.9.0-dind]
+  parallel:
+    matrix:
+      - SERVICE: [api, ingest, web]
+  script:
+    - docker build -t psm-$SERVICE:$CI_COMMIT_SHORT_SHA $SERVICE
+    - docker save psm-$SERVICE:$CI_COMMIT_SHORT_SHA -o image-$SERVICE.tar
+  artifacts:
+    paths: [image-$SERVICE.tar]
+    expire_in: 1 day
+
+trivy:
+  stage: scan
+  image:
+    name: aquasec/trivy:0.76.0
+    entrypoint: [""]
+  parallel:
+    matrix:
+      - SERVICE: [api, ingest, web]
+  needs:
+    - job: images
+      parallel:
+        matrix:
+          - SERVICE: $SERVICE
+  script:
+    - trivy image --input image-$SERVICE.tar --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed
