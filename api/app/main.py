@@ -23,6 +23,9 @@ from app.events import (
     EVENT_SQL,
     EVENT_TYPES,
     EVENTS_SQL,
+    SAT_GROUPS,
+    SATELLITES_SQL,
+    SATELLITES_TTL_S,
     SOURCES_HISTORY_SQL,
     STATUS_SQL,
     WATER_LEVELS_SQL,
@@ -129,6 +132,19 @@ def list_events(
 def list_aircraft(request: Request) -> Response:
     body = cached_query("aircraft", AIRCRAFT_TTL_S, AIRCRAFT_SQL, {})
     return geojson_response(request, body, AIRCRAFT_TTL_S)
+
+
+@app.get("/api/satellites")
+def list_satellites(
+    request: Request,
+    groups: Annotated[str | None, Query(description="Comma-separated CelesTrak groups")] = None,
+) -> Response:
+    requested = sorted(set(split(groups))) or ["stations", "visual"]
+    if unknown := set(requested) - set(SAT_GROUPS):
+        raise HTTPException(422, f"unknown group(s): {', '.join(sorted(unknown))}")
+    key = "satellites:" + ",".join(requested)
+    body = cached_query(key, SATELLITES_TTL_S, SATELLITES_SQL, {"groups": requested})
+    return geojson_response(request, body, SATELLITES_TTL_S)
 
 
 @app.get("/api/events/{event_id}")
