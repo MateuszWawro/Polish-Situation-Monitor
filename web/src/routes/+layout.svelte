@@ -3,9 +3,23 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+	import { connection } from '#lib/offline.svelte.ts';
+	import { formatDate } from '#lib/events.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
+
+	onMount(() => {
+		const update = () => (connection.online = navigator.onLine);
+		update();
+		addEventListener('online', update);
+		addEventListener('offline', update);
+		return () => {
+			removeEventListener('online', update);
+			removeEventListener('offline', update);
+		};
+	});
 
 	const links = [
 		{ path: '/', label: 'Mapa' },
@@ -37,6 +51,15 @@
 	</nav>
 </header>
 
+{#if !connection.online || connection.cachedAt}
+	<p class="offline" role="status">
+		<strong>Offline</strong> –
+		{connection.cachedAt
+			? `pokazujemy ostatni zapisany stan z ${formatDate(connection.cachedAt)}`
+			: 'brak połączenia, dane mogą być nieaktualne'}
+	</p>
+{/if}
+
 {@render children()}
 
 {#if page.url.pathname !== '/'}
@@ -48,6 +71,19 @@
 {/if}
 
 <style>
+	.offline {
+		position: fixed;
+		top: var(--header-h);
+		left: 0;
+		right: 0;
+		z-index: 9;
+		margin: 0;
+		padding: 0.35rem 0.75rem;
+		text-align: center;
+		font-size: 0.85rem;
+		background: #3b3f45;
+		color: #fff;
+	}
 	footer {
 		max-width: 46rem;
 		margin: 0 auto;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { getJson } from '#lib/offline.svelte.ts';
 	import {
 		LAYERS,
 		formatDate,
@@ -54,12 +55,8 @@
 	async function load() {
 		try {
 			const [s, h] = await Promise.all([
-				fetch('/api/sources/status', { cache: 'no-cache' }).then((r) =>
-					r.ok ? r.json() : Promise.reject(r)
-				),
-				fetch('/api/sources/history', { cache: 'no-cache' }).then((r) =>
-					r.ok ? r.json() : Promise.reject(r)
-				)
+				getJson<SourceStatus[]>('/api/sources/status', { cache: 'no-cache' }),
+				getJson<SourceHistory[]>('/api/sources/history', { cache: 'no-cache' })
 			]);
 			status = s;
 			history = h;

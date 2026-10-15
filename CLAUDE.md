@@ -38,6 +38,10 @@ Talk to the owner in Polish; code, names, comments and commits in English.
 - Static build (adapter-static). Dynamic pages (`/e/{id}`) are not prerendered: the server
   must fall back to `200.html` for unknown paths (Caddy: `try_files {path} {path}.html /200.html`).
 - Map state lives in the URL (`?l=&min=&c=&z=&e=`, see `web/src/lib/mapUrl.ts`).
+- Service worker (`web/src/service-worker/`): app shell cache-first, selected `/api/*` network-first
+  with the last good answer kept (marked `x-psm-cached-at` → "Offline" banner). OSM tiles are not
+  cached. Serve `service-worker.js` with `Cache-Control: no-cache` in prod so updates roll out.
+  It only runs in production builds – test with `npm run build && npm run preview`.
 
 ## Gotchas
 - Repo lives on exFAT: macOS creates `._*` files. They are git/prettier/docker-ignored; delete before tooling if something chokes

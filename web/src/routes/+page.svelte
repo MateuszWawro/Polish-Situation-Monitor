@@ -7,6 +7,7 @@
 	import { loadPlaces } from '#lib/places.ts';
 	import { buildMapUrl, parseMapUrl } from '#lib/mapUrl.ts';
 	import { shareLink } from '#lib/share.ts';
+	import { getJson } from '#lib/offline.svelte.ts';
 	import MapSearch from '#lib/MapSearch.svelte';
 	import { bboxPolygon, powiatBboxes } from '#lib/bboxes.ts';
 	import type { PlaceHit } from '#lib/search.ts';
@@ -144,9 +145,7 @@
 	async function loadEvents() {
 		const results = await Promise.allSettled(
 			[...new Set(LAYERS.map((l) => l.type))].map(async (type) => {
-				const r = await fetch(`/api/events?type=${type}`);
-				if (!r.ok) throw new Error(`${r.status}`);
-				data[type] = await r.json();
+				data[type] = await getJson<FeatureCollection>(`/api/events?type=${type}`);
 			})
 		);
 		loadError = results.some((r) => r.status === 'rejected');
@@ -154,8 +153,7 @@
 
 	async function loadStatus() {
 		try {
-			const r = await fetch('/api/sources/status');
-			if (r.ok) status = await r.json();
+			status = await getJson<SourceStatus[]>('/api/sources/status');
 		} catch {
 			// keep the previous status; the events error banner covers a dead API
 		}

@@ -10,6 +10,7 @@
 	import { resolve } from '$app/paths';
 	import { powiatBboxes } from '#lib/bboxes.ts';
 	import { buildMapUrl } from '#lib/mapUrl.ts';
+	import { getJson } from '#lib/offline.svelte.ts';
 
 	const REFRESH_MS = 5 * 60_000;
 
@@ -56,16 +57,13 @@
 		const codes = [...new Set(places.map((p) => p.teryt))];
 		if (!codes.length) return;
 		try {
-			const r = await fetch(`/api/areas/summary?teryt=${codes.join(',')}`);
-			if (!r.ok) throw new Error(`${r.status}`);
-			summary = await r.json();
+			summary = await getJson(`/api/areas/summary?teryt=${codes.join(',')}`);
 			loadError = false;
 		} catch {
 			loadError = true; // keep showing the last summary
 		}
 		try {
-			const r = await fetch('/api/sources/status');
-			if (r.ok) status = await r.json();
+			status = await getJson<SourceStatus[]>('/api/sources/status');
 		} catch {
 			// covered by loadError
 		}
