@@ -85,3 +85,16 @@ def test_health_reports_database_down(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(main, "get_engine", broken)
     response = client.get("/health")
     assert response.status_code == 503 and response.json()["db"] is False
+
+
+@pytest.mark.parametrize(
+    "teryt", ["", "14", "1465,abcd", "1,2,3,4,5,6", "1201,1202,1203,1204,1205,1206"]
+)
+def test_areas_summary_validation(teryt: str, calls: list[object]) -> None:
+    assert client.get("/api/areas/summary", params={"teryt": teryt}).status_code == 422
+    assert calls == []
+
+
+def test_areas_summary_dedupes_codes(calls: list[dict[str, object]]) -> None:
+    assert client.get("/api/areas/summary?teryt=1465,1261,1465").status_code == 200
+    assert calls[0]["codes"] == ["1261", "1465"]

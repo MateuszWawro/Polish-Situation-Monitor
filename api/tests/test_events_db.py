@@ -92,3 +92,14 @@ def test_sources_status_lists_all_sources() -> None:
 
 def test_health_checks_database() -> None:
     assert client.get("/health").json() == {"status": "ok", "db": True}
+
+
+def test_areas_summary(events: dict[str, uuid.UUID]) -> None:
+    body = client.get("/api/areas/summary", params={"teryt": "1465,1261,0201"}).json()
+    assert set(body) == {"1465", "1261", "0201"}
+    titles = {code: {e["title"] for e in evs if e["title"] in {"warsaw", "krakow", "old"}}
+              for code, evs in body.items()}  # fmt: skip
+    assert titles == {"1465": {"warsaw"}, "1261": {"krakow"}, "0201": set()}  # "old" has ended
+    assert "geometry" not in body["1465"][0]
+    severities = [e["severity"] for e in body["1465"]]
+    assert severities == sorted(severities, reverse=True)

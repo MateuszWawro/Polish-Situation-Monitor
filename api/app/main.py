@@ -15,6 +15,7 @@ from app import cache
 from app.db import get_engine
 from app.events import (
     ADMIN_UNITS_SQL,
+    AREAS_SUMMARY_SQL,
     CACHE_TTL_S,
     EVENT_SQL,
     EVENT_TYPES,
@@ -24,6 +25,8 @@ from app.events import (
 
 RATE_LIMIT_PER_MIN = 120
 TERYT_RE = re.compile(r"^\d{2}(\d{2})?$")
+POWIAT_RE = re.compile(r"^\d{4}$")
+MAX_AREAS = 5  # "Moja okolica" allows up to 5 places
 
 app = FastAPI(title="Polish Situation Monitor API")
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -123,6 +126,23 @@ def get_event(request: Request, event_id: uuid.UUID) -> Response:
     if body is None:
         raise HTTPException(404, "event not found")
     return geojson_response(request, body.encode(), 60)
+
+
+@app.get("/api/areas/summary")
+def areas_summary(
+    request: Request,
+    teryt: Annotated[str, Query(description="Comma-separated 4-digit powiat TERYT codes")],
+) -> Response:
+    codes = sorted(set(split(teryt)))
+    if not 1 <= len(codes) <= MAX_AREAS or not all(POWIAT_RE.match(c) for c in codes):
+        raise HTTPException(422, f"teryt must be 1–{MAX_AREAS} 4-digit powiat codes")
+    ttl = min(CACHE_TTL_S.values())
+    body = cached_query(f"areas:{','.join(codes)}", ttl, AREAS_SUMMARY_SQL, {"codes": codes})
+    return Response(
+        body,
+        media_type="application/json",
+        headers={"Cache-Control": f"public, max-age={ttl}"},
+    )
 
 
 @app.get("/api/sources/status")

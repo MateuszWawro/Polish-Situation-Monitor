@@ -59,6 +59,18 @@ EVENT_SQL = text(f"""
 """)
 
 # Every known source is listed, including ones that never ran (stale by definition).
+# "Moja okolica": active events per powiat, no geometry (list view). Every requested code is a key.
+AREAS_SUMMARY_SQL = text(f"""
+    SELECT json_object_agg(code, coalesce(e.events, '[]'::json))::text
+    FROM unnest(CAST(:codes AS text[])) AS code
+    LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object({PROPERTIES})
+                        ORDER BY severity DESC, valid_from DESC NULLS LAST) AS events
+        FROM events
+        WHERE teryt_powiat @> ARRAY[code] AND (valid_to IS NULL OR valid_to > now())
+    ) e ON true
+""")
+
 STATUS_SQL = text("""
     SELECT json_agg(json_build_object(
         'source', s.source,
