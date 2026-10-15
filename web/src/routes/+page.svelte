@@ -310,7 +310,9 @@
 		left: 0.5rem;
 		z-index: 5;
 		width: min(20rem, calc(100% - 1rem));
-		max-height: calc(100% - var(--header-h) - 1rem);
+		/* Leaves the bottom strip free: the map attribution (licence requirement) lives there. */
+		--attribution-h: 2.75rem;
+		max-height: calc(100% - var(--header-h) - 0.5rem - var(--attribution-h));
 		overflow: auto;
 		background: var(--panel);
 		border: 1px solid var(--border);
@@ -320,6 +322,7 @@
 	}
 	.banners:not(:empty) ~ .panel {
 		top: calc(var(--header-h) + 4.5rem);
+		max-height: calc(100% - var(--header-h) - 4.5rem - var(--attribution-h));
 	}
 	.panel-toggle {
 		display: flex;
