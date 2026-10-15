@@ -20,19 +20,27 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
 
+  # One-shot: applies migrations. Boundary import (once):
+  #   docker compose -f deploy/docker-compose.yml run --rm migrate python import_prg.py
+  migrate:
+    build: ../db
+    env_file: ../.env
+    depends_on:
+      db: { condition: service_healthy }
+
   api:
     build: ../api
     env_file: ../.env
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
-      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
 
   ingest:
     build: ../ingest
     env_file: ../.env
     depends_on:
-      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
 
   web:
     build: ../web

@@ -6,7 +6,7 @@ stages: [lint, test, build, scan]
     - cd $SERVICE && pip install -q -e '.[dev]'
   parallel:
     matrix:
-      - SERVICE: [api, ingest]
+      - SERVICE: [api, ingest, db]
 
 python-lint:
   extends: .python
@@ -40,7 +40,7 @@ images:
   services: [docker:29.9.0-dind]
   parallel:
     matrix:
-      - SERVICE: [api, ingest, web]
+      - SERVICE: [api, ingest, db, web]
   script:
     - docker build -t psm-$SERVICE:$CI_COMMIT_SHORT_SHA $SERVICE
     - docker save psm-$SERVICE:$CI_COMMIT_SHORT_SHA -o image-$SERVICE.tar
@@ -55,7 +55,7 @@ trivy:
     entrypoint: [""]
   parallel:
     matrix:
-      - SERVICE: [api, ingest, web]
+      - SERVICE: [api, ingest, db, web]
   needs:
     - job: images
       parallel:

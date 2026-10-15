@@ -20,11 +20,16 @@ Talk to the owner in Polish; code, names, comments and commits in English.
 - No ads on the site, ever (IMGW terms treat ad-bearing sites as commercial use).
 
 ## Commands
-- Python (`api/`, `ingest/`): `python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'`,
+- Python (`api/`, `ingest/`, `db/`): `python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'`,
   then `ruff check . && ruff format --check . && mypy . && pytest`
 - Web: `npm ci && npm run lint && npm run check && npm test && npm run build`
   (npm 10.9 crashes resolving this tree – use npm ≥ 11, e.g. `npx npm@11 install`)
 - Stack: `cp .env.example .env && docker compose -f deploy/docker-compose.yml up --build`
 
+- Migrations: `cd db && DATABASE_URL=... alembic upgrade head` (hand-written SQL, no autogenerate)
+- Boundaries: `cd db && DATABASE_URL=... python import_prg.py` (~1 min, re-runnable)
+- DB-backed API tests run only when `DATABASE_URL` is set (skipped in CI for now)
+
 ## Gotchas
-- Repo lives on exFAT: macOS creates `._*` files. They are git/prettier/docker-ignored; delete before tooling if something chokes.
+- Repo lives on exFAT: macOS creates `._*` files. They are git/prettier/docker-ignored; delete before tooling if something chokes
+  (Alembic crashes on `._*.py` in `db/migrations/versions`).
