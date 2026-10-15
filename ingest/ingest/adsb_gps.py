@@ -6,6 +6,8 @@ This is the gpsjam.org method, but over a rolling 60-minute window instead of a 
 
 Not an official source and not proof of jamming: low NACp can also come from aircraft
 equipment. The map labels the layer as an estimate.
+
+The same request also feeds the aircraft map layer (ingest.aircraft).
 """
 
 import logging
@@ -18,8 +20,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
+import psycopg
 from pydantic import BaseModel, ValidationError
 
+from ingest import aircraft as map_aircraft
 from ingest.base import Event, Worker
 
 log = logging.getLogger(__name__)
@@ -106,7 +110,7 @@ def aggregate(snapshots: list[list[Report]]) -> list[Cell]:
 class AdsbGpsWorker(Worker[Cell]):
     source = "adsb_lol"
     url = URL
-    interval_s = 120
+    interval_s = 60
     model = Cell
 
     def __init__(
@@ -119,11 +123,13 @@ class AdsbGpsWorker(Worker[Cell]):
         # In memory on purpose: after a restart the window simply refills within an hour.
         self.window: deque[tuple[float, list[Report]]] = deque()
         self.elevated_since: dict[str, datetime] = {}
+        self.snapshot: list[map_aircraft.MapAircraft] = []
 
     def fetch(self, client: httpx.Client) -> list[dict[str, Any]]:
         payload = self.get(client, self.url).json()
         if not isinstance(payload, dict) or not isinstance(payload.get("ac"), list):
             raise ValueError("adsb_lol: expected an object with an 'ac' array")
+        self.snapshot = [m for raw in payload["ac"] if (m := map_aircraft.parse(raw))]
         reports = [
             Report(ac.hex, cell_of(ac.lat, ac.lon), ac.nac_p < BAD_NACP)
             for raw in payload["ac"]
@@ -134,6 +140,9 @@ class AdsbGpsWorker(Worker[Cell]):
         while self.window and self.window[0][0] < now - WINDOW_S:
             self.window.popleft()
         return [c.model_dump() for c in aggregate([r for _, r in self.window])]
+
+    def store_items(self, conn: psycopg.Connection, items: list[Cell]) -> None:
+        map_aircraft.replace_snapshot(conn, self.snapshot)
 
     def normalize(self, item: Cell) -> Event | None:
         cell_id = f"{item.row}:{item.col}"
