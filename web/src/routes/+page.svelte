@@ -8,7 +8,9 @@
 		ROAD_ICONS,
 		SEVERITY_COLORS,
 		SEVERITY_LABELS,
+		formatDate,
 		formatRange,
+		groupEvents,
 		severityLabel,
 		timeAgo,
 		type EventProps,
@@ -25,6 +27,7 @@
 	);
 	let status: SourceStatus[] = $state([]);
 	let selected: EventProps[] = $state([]);
+	const groups = $derived(groupEvents(selected));
 	let loadError = $state(false);
 	let panelOpen = $state(false);
 	let now = $state(Date.now());
@@ -134,24 +137,48 @@
 {#if selected.length}
 	<section class="details" aria-label="Szczegóły zdarzeń" aria-live="polite">
 		<button class="close" onclick={() => (selected = [])} aria-label="Zamknij szczegóły">✕</button>
-		{#each selected as ev (ev.id)}
-			<article>
-				<p class="sev">
-					<span class="swatch" style:background={SEVERITY_COLORS[ev.severity]}></span>
-					{severityLabel(ev.severity)}
-				</p>
-				<h2>{ev.title}</h2>
-				<p class="meta">Ważność: {formatRange(ev.valid_from, ev.valid_to)}</p>
-				{#if ev.description}<p class="desc">{ev.description}</p>{/if}
-				<p class="meta">
-					Źródło: {sourceLabel(ev.source)}
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
-					{#if ev.source_url}· <a href={ev.source_url} target="_blank" rel="noopener"
-							>strona źródła</a
-						>{/if}
-					· aktualizacja {timeAgo(ev.updated_at, now)}
-				</p>
-			</article>
+		<h2 class="summary-title">
+			{selected.length === 1 ? '1 zdarzenie' : `${selected.length} zdarzeń`} w tym miejscu
+		</h2>
+		{#each groups as group (group.layer.type)}
+			<section class="group" aria-label={group.layer.label}>
+				<h3>{group.layer.label} <span class="count">({group.count})</span></h3>
+				{#each group.rows as row (row.key)}
+					{@const single = row.events.length === 1 ? row.events[0] : null}
+					<details open={selected.length === 1}>
+						<summary>
+							<span class="badge" style:background={SEVERITY_COLORS[row.severity]}
+								>{row.severity}</span
+							>
+							<span class="row-title">{row.title}</span>
+							{#if single}
+								<span class="row-until"
+									>{single.valid_to ? `do ${formatDate(single.valid_to)}` : ''}</span
+								>
+							{:else}
+								<span class="row-until">×{row.events.length}</span>
+							{/if}
+						</summary>
+						<div class="body">
+							<p class="sev">{severityLabel(row.severity)}</p>
+							{#each row.events as ev (ev.id)}
+								<div class="item">
+									<p class="meta">Ważność: {formatRange(ev.valid_from, ev.valid_to)}</p>
+									{#if ev.description}<p class="desc">{ev.description}</p>{/if}
+									<p class="meta">
+										Źródło: {sourceLabel(ev.source)}
+										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+										{#if ev.source_url}· <a href={ev.source_url} target="_blank" rel="noopener"
+												>strona źródła</a
+											>{/if}
+										· aktualizacja {timeAgo(ev.updated_at, now)}
+									</p>
+								</div>
+							{/each}
+						</div>
+					</details>
+				{/each}
+			</section>
 		{/each}
 		<p class="disclaimer">
 			Narzędzie pomocnicze – nie zastępuje Alertów RCB ani komunikatów służb.
@@ -304,20 +331,80 @@
 		font-size: 1.1rem;
 		cursor: pointer;
 	}
-	article + article {
+	.summary-title {
+		margin: 0.6rem 0 0.25rem;
+		font-size: 1rem;
+	}
+	.group h3 {
+		margin: 0.75rem 0 0.25rem;
+		font-size: 0.85rem;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		color: var(--muted);
+	}
+	details {
 		border-top: 1px solid var(--border);
 	}
-	article h2 {
-		margin: 0.1rem 0 0.25rem;
-		font-size: 1.05rem;
-	}
-	.sev {
+	summary {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
-		margin: 0.5rem 0 0;
+		gap: 0.5rem;
+		min-height: 44px;
+		padding: 0.35rem 0;
+		cursor: pointer;
+		list-style: none;
+	}
+	summary::-webkit-details-marker {
+		display: none;
+	}
+	summary::after {
+		content: '▸';
+		color: var(--muted);
+		flex: none;
+	}
+	details[open] summary::after {
+		content: '▾';
+	}
+	.badge {
+		flex: none;
+		width: 1.4rem;
+		height: 1.4rem;
+		border-radius: 4px;
+		display: grid;
+		place-items: center;
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: #1b1f24;
+		border: 1px solid rgba(0, 0, 0, 0.3);
+	}
+	.row-title {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.95rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	details[open] .row-title {
+		white-space: normal;
 		font-weight: 600;
-		font-size: 0.9rem;
+	}
+	.row-until {
+		flex: none;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+	.body {
+		padding: 0 0 0.5rem 1.9rem;
+	}
+	.item + .item {
+		border-top: 1px dashed var(--border);
+		margin-top: 0.4rem;
+	}
+	.sev {
+		margin: 0;
+		font-weight: 600;
+		font-size: 0.85rem;
 	}
 	.meta {
 		color: var(--muted);

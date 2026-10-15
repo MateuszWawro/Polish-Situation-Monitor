@@ -126,3 +126,34 @@ export const ROAD_ICONS: { severity: number; label: string; svg: string }[] = [
 		svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2 22.5 21H1.5Z" fill="#e8b420" stroke="#1b1f24" stroke-width="1.5"/><rect x="11" y="8.5" width="2" height="6.5" fill="#1b1f24"/><rect x="11" y="16.5" width="2" height="2" fill="#1b1f24"/></svg>'
 	}
 ];
+
+export interface EventRow {
+	key: string;
+	title: string;
+	severity: number;
+	/** Same title + severity in one place, e.g. 14 drought warnings for one voivodeship. */
+	events: EventProps[];
+}
+
+export interface EventGroup {
+	layer: LayerDef;
+	count: number;
+	rows: EventRow[];
+}
+
+/** Group clicked events by layer, merging identical rows. Most severe group/row first. */
+export function groupEvents(events: EventProps[]): EventGroup[] {
+	return LAYERS.map((layer) => {
+		const rows: EventRow[] = [];
+		for (const ev of events.filter((e) => e.type === layer.type)) {
+			const key = `${ev.severity}|${ev.title}`;
+			const row = rows.find((r) => r.key === key);
+			if (row) row.events.push(ev);
+			else rows.push({ key, title: ev.title, severity: ev.severity, events: [ev] });
+		}
+		rows.sort((a, b) => b.severity - a.severity);
+		return { layer, count: rows.reduce((n, r) => n + r.events.length, 0), rows };
+	})
+		.filter((g) => g.count)
+		.sort((a, b) => b.rows[0].severity - a.rows[0].severity);
+}

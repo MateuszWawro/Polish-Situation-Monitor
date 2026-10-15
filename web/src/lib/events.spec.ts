@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRange, severityLabel, timeAgo } from './events';
+import { formatRange, groupEvents, severityLabel, timeAgo, type EventProps } from './events';
 
 describe('timeAgo', () => {
 	const now = Date.parse('2026-10-15T12:00:00Z');
@@ -25,5 +25,28 @@ describe('formatting', () => {
 	it('labels severity with text, not only colour', () => {
 		expect(severityLabel(3)).toBe('Stopień 3 – wysoki');
 		expect(severityLabel(9)).toBe('Stopień 9');
+	});
+});
+
+describe('groupEvents', () => {
+	const ev = (id: string, type: EventProps['type'], severity: number, title: string) =>
+		({ id, type, severity, title }) as EventProps;
+
+	it('groups by layer, merges identical rows and puts the most severe first', () => {
+		const groups = groupEvents([
+			ev('1', 'hydro_warning', 1, 'Susza hydrologiczna'),
+			ev('2', 'hydro_warning', 1, 'Susza hydrologiczna'),
+			ev('3', 'road_incident', 1, 'Roboty drogowe: A4'),
+			ev('4', 'road_incident', 3, 'Zamknięcie drogi: A4'),
+			ev('5', 'air_quality', 0, 'Jakość powietrza: Dobry')
+		]);
+		expect(groups.map((g) => [g.layer.type, g.count])).toEqual([
+			['road_incident', 2],
+			['hydro_warning', 2],
+			['air_quality', 1]
+		]);
+		expect(groups[0].rows.map((r) => r.severity)).toEqual([3, 1]);
+		expect(groups[1].rows).toHaveLength(1);
+		expect(groups[1].rows[0].events.map((e) => e.id)).toEqual(['1', '2']);
 	});
 });
