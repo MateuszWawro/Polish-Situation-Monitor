@@ -156,3 +156,10 @@ def test_water_levels() -> None:
         with get_engine().begin() as conn:
             conn.execute(text("DELETE FROM water_levels WHERE station_id = '999000001'"))
             conn.execute(text("DELETE FROM hydro_stations WHERE station_id = '999000001'"))
+
+
+def test_admin_bboxes() -> None:
+    body = client.get("/api/admin-units/bboxes").json()
+    assert len(body) >= 370
+    west, south, east, north = body["1861"]  # Krosno
+    assert 21.6 < west < east < 21.9 and 49.6 < south < north < 49.8

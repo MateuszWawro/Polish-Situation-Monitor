@@ -130,6 +130,15 @@ WATER_LEVELS_SQL = text("""
     FROM hydro_stations st WHERE st.station_id = :station_id
 """)
 
+# Compact [west, south, east, north] per powiat for "zoom to place" (no geometry download).
+ADMIN_BBOXES_SQL = text("""
+    SELECT json_object_agg(teryt, json_build_array(
+        round(ST_XMin(geom)::numeric, 4), round(ST_YMin(geom)::numeric, 4),
+        round(ST_XMax(geom)::numeric, 4), round(ST_YMax(geom)::numeric, 4)
+    ) ORDER BY teryt)::text
+    FROM admin_units WHERE level = 'powiat'
+""")
+
 ADMIN_UNITS_SQL = text("""
     SELECT json_build_object(
         'type', 'FeatureCollection',

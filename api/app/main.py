@@ -14,6 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from app import cache
 from app.db import get_engine
 from app.events import (
+    ADMIN_BBOXES_SQL,
     ADMIN_UNITS_SQL,
     AREAS_SUMMARY_SQL,
     CACHE_TTL_S,
@@ -168,6 +169,16 @@ def water_levels(
 def sources_status() -> Response:
     body = query_json(STATUS_SQL, {}) or "[]"
     return Response(body, media_type="application/json", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/admin-units/bboxes")
+def admin_bboxes(request: Request) -> Response:
+    body = cached_query("admin-bboxes", 86400, ADMIN_BBOXES_SQL, {})
+    etag = '"' + hashlib.sha256(body).hexdigest()[:32] + '"'
+    headers = {"ETag": etag, "Cache-Control": "public, max-age=86400"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
 
 
 @app.get("/api/admin-units")
