@@ -217,3 +217,27 @@ def test_aircraft_snapshot_replaced_each_run(conn: psycopg.Connection) -> None:
     assert conn.execute("SELECT hex, class FROM aircraft").fetchall() == [("a3", "private")]
     conn.execute("DELETE FROM aircraft")
     conn.execute("DELETE FROM events WHERE source = 'adsb_lol'")
+
+
+def test_satellites_snapshot_replaced(conn: psycopg.Connection) -> None:
+    from ingest import satellites
+
+    conn.execute("DELETE FROM satellites")
+    tle = (
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   26288.11220063  .00005682  00000+0  11168-3 0  9991\n"
+        "2 25544  51.6331  66.6267 0006716 264.3647  95.6576 15.48871015590345\n"
+    )
+
+    def run_sats(groups: list[str]) -> None:
+        rows = [r for g in groups for r in satellites.parse_tle(tle, g)]
+        satellites.store(conn, rows)
+
+    # ISS appears in both groups; ON CONFLICT keeps the first (priority) group.
+    run_sats(["stations", "visual"])
+    got = conn.execute("SELECT norad_id, name, grp FROM satellites").fetchall()
+    assert got == [(25544, "ISS (ZARYA)", "stations")]
+
+    run_sats(["visual"])
+    assert conn.execute("SELECT grp FROM satellites").fetchall() == [("visual",)]
+    conn.execute("DELETE FROM satellites")

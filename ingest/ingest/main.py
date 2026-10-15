@@ -9,6 +9,7 @@ import httpx
 import psycopg
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from ingest import satellites
 from ingest.adsb_gps import AdsbGpsWorker
 from ingest.base import Worker
 from ingest.firms import FirmsWorker
@@ -49,6 +50,15 @@ def run_worker(worker: Worker[Any]) -> None:
         log.exception("%s: could not start run", worker.source)
 
 
+def run_satellites() -> None:
+    # Separate from the event workers: satellites are a TLE snapshot, not events.
+    try:
+        with psycopg.connect(dsn(), autocommit=True) as conn, httpx.Client() as client:
+            satellites.run(conn, client)
+    except Exception:
+        log.exception("celestrak: satellite fetch failed")
+
+
 def purge_old() -> None:
     with psycopg.connect(dsn(), autocommit=True) as conn:
         for sql in RETENTION_SQL:
@@ -70,6 +80,13 @@ def build_scheduler() -> BlockingScheduler:
             next_run_time=datetime.now(UTC),
         )
     scheduler.add_job(purge_old, "interval", id="purge_old", hours=6)
+    scheduler.add_job(
+        run_satellites,
+        "interval",
+        id="satellites",
+        seconds=satellites.INTERVAL_S,
+        next_run_time=datetime.now(UTC),
+    )
     return scheduler
 
 
