@@ -1,15 +1,60 @@
-"""Ingest entrypoint: one scheduler process, one job per source (workers added in later steps)."""
+"""Ingest entrypoint: one scheduler process, one isolated job per source."""
 
 import logging
+import os
+from datetime import UTC, datetime
+from typing import Any
 
+import httpx
+import psycopg
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from ingest.base import Worker
+from ingest.imgw_meteo import ImgwMeteoWorker
+
 log = logging.getLogger("ingest")
+
+WORKERS: list[Worker[Any]] = [ImgwMeteoWorker()]
+
+RAW_RETENTION_SQL = (
+    "UPDATE events SET raw = NULL WHERE raw IS NOT NULL AND fetched_at < now() - interval '7 days'"
+)
+
+
+def dsn() -> str:
+    return os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+
+
+def run_worker(worker: Worker[Any]) -> None:
+    # Fresh connection per run: a broken connection in one source never leaks into another.
+    try:
+        with psycopg.connect(dsn(), autocommit=True) as conn, httpx.Client() as client:
+            worker.run(conn, client)
+    except Exception:
+        log.exception("%s: could not start run", worker.source)
+
+
+def purge_raw() -> None:
+    with psycopg.connect(dsn(), autocommit=True) as conn:
+        conn.execute(RAW_RETENTION_SQL)
 
 
 def build_scheduler() -> BlockingScheduler:
     # max_instances=1 + coalesce: a slow source never stacks runs or blocks others
-    return BlockingScheduler(timezone="UTC", job_defaults={"max_instances": 1, "coalesce": True})
+    scheduler = BlockingScheduler(
+        timezone="UTC", job_defaults={"max_instances": 1, "coalesce": True}
+    )
+    for worker in WORKERS:
+        scheduler.add_job(
+            run_worker,
+            "interval",
+            args=[worker],
+            id=worker.source,
+            seconds=worker.interval_s,
+            next_run_time=datetime.now(UTC),
+        )
+    scheduler.add_job(purge_raw, "interval", id="purge_raw", hours=6)
+    return scheduler
 
 
 def main() -> None:
