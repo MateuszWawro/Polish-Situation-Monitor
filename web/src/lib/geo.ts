@@ -61,3 +61,12 @@ export function bbox(geometry: Geometry): [[number, number], [number, number]] |
 				[e, n]
 			];
 }
+
+export interface MapPlace {
+	id: string;
+	name: string;
+	/** Exact point from "use my location", else the middle of the powiat. */
+	lngLat: [number, number];
+	/** Powiat outline, when loaded. */
+	area?: Geometry;
+}

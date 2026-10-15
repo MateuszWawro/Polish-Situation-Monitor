@@ -3,7 +3,7 @@
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import type { Map as MlMap, GeoJSONSource, MapMouseEvent } from 'maplibre-gl';
 	import type { FeatureCollection, Geometry } from 'geojson';
-	import { bbox, type MapViewState } from '#lib/geo.ts';
+	import { bbox, type MapPlace, type MapViewState } from '#lib/geo.ts';
 	// Emitted as a build asset: maplibre would otherwise look for the worker next to its chunk.
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 	import {
@@ -30,13 +30,29 @@
 		onmove?: (view: MapViewState) => void;
 		/** Geometry to zoom to (a shared event). */
 		focus?: Geometry | null;
+		/** User's places ("Moja okolica"); drawn locally, never sent anywhere. */
+		places?: MapPlace[];
 	}
-	let { data, visible, minSeverity, onselect, initialView, onmove, focus }: Props = $props();
+	let {
+		data,
+		visible,
+		minSeverity,
+		onselect,
+		initialView,
+		onmove,
+		focus,
+		places = []
+	}: Props = $props();
+
+	let MarkerCtor: typeof import('maplibre-gl').Marker | undefined;
+	let markers: import('maplibre-gl').Marker[] = [];
 
 	let container: HTMLDivElement;
 	let map: MlMap | undefined = $state();
 	let loaded = $state(false);
 
+	// Places: violet, outside the severity palette so a place is never mistaken for a warning.
+	const PLACE_COLOR = '#6f42c1';
 	const POLAND: [[number, number], [number, number]] = [
 		[14.07, 49.0],
 		[24.15, 54.84]
@@ -88,7 +104,8 @@
 				map.setPaintProperty('osm', k as 'raster-brightness-max', v);
 		};
 		import('maplibre-gl').then(
-			({ Map: MapCtor, NavigationControl, AttributionControl, setWorkerUrl }) => {
+			({ Map: MapCtor, Marker, NavigationControl, AttributionControl, setWorkerUrl }) => {
+				MarkerCtor = Marker;
 				if (cancelled) return;
 				setWorkerUrl(workerUrl);
 				const m = new MapCtor({
@@ -131,6 +148,10 @@
 				);
 				m.on('load', async () => {
 					await loadIcons(m);
+					m.addSource('places', {
+						type: 'geojson',
+						data: { type: 'FeatureCollection', features: [] }
+					});
 					for (const layer of [...LAYERS].sort((a, b) => DRAW_ORDER[a.kind] - DRAW_ORDER[b.kind])) {
 						m.addSource(layer.id, {
 							type: 'geojson',
@@ -235,13 +256,67 @@
 		const box = bbox(focus);
 		if (box) map.fitBounds(box, { padding: 60, maxZoom: 11, duration: 600 });
 	});
+
+	$effect(() => {
+		const m = map;
+		if (!m || !loaded || !MarkerCtor) return;
+		// Outline of each place's powiat, drawn above event areas.
+		if (!m.getLayer('places-line'))
+			m.addLayer({
+				id: 'places-line',
+				type: 'line',
+				source: 'places',
+				paint: { 'line-color': PLACE_COLOR, 'line-width': 2.5, 'line-opacity': 0.9 }
+			});
+		(m.getSource('places') as GeoJSONSource).setData({
+			type: 'FeatureCollection',
+			features: places
+				.filter((p) => p.area)
+				.map((p) => ({ type: 'Feature', properties: {}, geometry: p.area! }))
+		});
+		for (const marker of markers) marker.remove();
+		markers = places.map((p) => {
+			const el = document.createElement('button');
+			el.type = 'button';
+			el.className = 'place-pin';
+			el.textContent = `📍 ${p.name}`; // textContent: user-typed names are never HTML
+			el.setAttribute('aria-label', `Twoje miejsce: ${p.name}. Przybliż mapę.`);
+			el.addEventListener('click', (e) => {
+				e.stopPropagation(); // don't open event details under the pin
+				const box = p.area ? bbox(p.area) : null;
+				if (box) m.fitBounds(box, { padding: 60, maxZoom: 11 });
+				else m.flyTo({ center: p.lngLat, zoom: 11 });
+			});
+			return new MarkerCtor!({ element: el, anchor: 'bottom' }).setLngLat(p.lngLat).addTo(m);
+		});
+	});
 </script>
 
-<div class="map" bind:this={container} role="region" aria-label="Mapa zdarzeń w Polsce"></div>
+<div
+	class="map"
+	style:--place={PLACE_COLOR}
+	bind:this={container}
+	role="region"
+	aria-label="Mapa zdarzeń w Polsce"
+></div>
 
 <style>
 	.map {
 		position: absolute;
 		inset: var(--header-h) 0 0 0;
+	}
+	/* Marker elements are created outside Svelte, hence :global. */
+	.map :global(.place-pin) {
+		font: inherit;
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		border: 2px solid #fff;
+		background: var(--place);
+		color: #fff;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+		cursor: pointer;
+		white-space: nowrap;
 	}
 </style>

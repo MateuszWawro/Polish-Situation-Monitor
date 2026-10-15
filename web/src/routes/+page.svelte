@@ -3,7 +3,8 @@
 	import type { FeatureCollection, Geometry } from 'geojson';
 	import { replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { MapViewState } from '#lib/geo.ts';
+	import type { MapPlace, MapViewState } from '#lib/geo.ts';
+	import { loadPlaces } from '#lib/places.ts';
 	import { buildMapUrl, parseMapUrl } from '#lib/mapUrl.ts';
 	import { shareLink } from '#lib/share.ts';
 	import MapSearch from '#lib/MapSearch.svelte';
@@ -57,6 +58,34 @@
 		shareNote =
 			result === 'copied' ? 'Skopiowano link' : result === 'failed' ? 'Nie udało się' : '';
 		setTimeout(() => (shareNote = ''), 2500);
+	}
+
+	let myPlaces: MapPlace[] = $state([]);
+
+	/** Pins and powiat outlines for "Moja okolica" places (all local to this device). */
+	async function loadMyPlaces() {
+		try {
+			const places = await loadPlaces();
+			if (!places.length) return;
+			const boxes = await powiatBboxes();
+			const center = (t: string): [number, number] => {
+				const [w, s, e, n] = boxes[t] ?? [19, 52, 19, 52];
+				return [(w + e) / 2, (s + n) / 2];
+			};
+			myPlaces = places.map((p) => ({
+				id: p.id,
+				name: p.name,
+				lngLat: p.point ?? center(p.teryt)
+			}));
+			// Outlines need the full boundaries (~300 KB, browser-cached for a day).
+			const powiaty: FeatureCollection = await (
+				await fetch('/api/admin-units?level=powiat')
+			).json();
+			const shape = (t: string) => powiaty.features.find((f) => f.id === t)?.geometry;
+			myPlaces = myPlaces.map((mp, i) => ({ ...mp, area: shape(places[i].teryt) }));
+		} catch {
+			// no places on the map is fine
+		}
 	}
 
 	async function zoomToPlace(hit: PlaceHit) {
@@ -144,6 +173,7 @@
 		if (fromUrl.layers) for (const l of LAYERS) visible[l.id] = fromUrl.layers.includes(l.id);
 		if (fromUrl.minSeverity !== undefined) minSeverity = fromUrl.minSeverity;
 		if (fromUrl.event) openLinkedEvent(fromUrl.event);
+		loadMyPlaces();
 		urlReady = true;
 		loadEvents();
 		loadStatus();
@@ -163,6 +193,7 @@
 	{visible}
 	{minSeverity}
 	{focus}
+	places={myPlaces}
 	initialView={fromUrl.view}
 	onmove={(v) => (view = v)}
 	onselect={(events) => {

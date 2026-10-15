@@ -7,6 +7,9 @@
 	import { findPowiat } from '#lib/geo.ts';
 	import { MAX_PLACES, deletePlace, loadPlaces, savePlace, type Place } from '#lib/places.ts';
 	import { searchPlaces, type PlaceHit, type PlacesIndex } from '#lib/search.ts';
+	import { resolve } from '$app/paths';
+	import { powiatBboxes } from '#lib/bboxes.ts';
+	import { buildMapUrl } from '#lib/mapUrl.ts';
 
 	const REFRESH_MS = 5 * 60_000;
 
@@ -27,6 +30,19 @@
 	let locating = $state(false);
 	let locateError = $state('');
 	const hits = $derived(index && !chosen ? searchPlaces(index, query) : []);
+
+	let boxes: Record<string, [number, number, number, number]> = $state({});
+
+	/** Map link: exact spot for a located place (zoom 11), else the powiat's middle (zoom 9). */
+	function mapLink(place: Place): string {
+		const box = boxes[place.teryt];
+		const view = place.point
+			? { center: place.point, zoom: 11 }
+			: box
+				? { center: [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2] as [number, number], zoom: 9 }
+				: undefined;
+		return `${resolve('/')}${buildMapUrl({ view })}`;
+	}
 
 	const lastUpdate = $derived(
 		status
@@ -153,6 +169,9 @@
 	}
 
 	onMount(() => {
+		powiatBboxes()
+			.then((b) => (boxes = b))
+			.catch(() => {});
 		reloadPlaces().then(async () => {
 			adding = places.length === 0;
 			await refresh();
@@ -196,11 +215,15 @@
 					<h2 id="place-{place.id}">{place.name}</h2>
 					<p class="area">{place.area}</p>
 				</div>
-				<button
-					class="remove"
-					onclick={() => removePlace(place)}
-					aria-label="Usuń miejsce {place.name}">Usuń</button
-				>
+				<div class="place-actions">
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved path + query -->
+					<a href={mapLink(place)} aria-label="Pokaż {place.name} na mapie">Na mapie</a>
+					<button
+						class="remove"
+						onclick={() => removePlace(place)}
+						aria-label="Usuń miejsce {place.name}">Usuń</button
+					>
+				</div>
 			</header>
 			{#if !events}
 				<p class="muted">{ready ? 'Brak danych.' : 'Ładowanie…'}</p>
@@ -303,6 +326,18 @@
 		margin: 0;
 		font-size: 0.85rem;
 		color: var(--muted);
+	}
+	.place-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+	.place-actions a {
+		color: var(--accent);
+		padding: 0.25rem 0.5rem;
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
 	}
 	.empty {
 		margin: 0.5rem 0;
