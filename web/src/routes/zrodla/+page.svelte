@@ -31,6 +31,15 @@
 				'Punkt cieplny to wykrycie satelitarne – nie każdy jest pożarem (np. instalacje przemysłowe). Pewność wykrycia niska/średnia/wysoka → stopień 1/2/3.'
 		},
 		{
+			name: 'GDDKiA – utrudnienia na drogach krajowych',
+			url: 'https://www.gov.pl/web/gddkia',
+			terms: 'https://dane.gov.pl/pl/dataset/2752',
+			termsLabel: 'Zbiór „Utrudnienia na drogach” w dane.gov.pl (licencja CC0 1.0)',
+			attribution: ['Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.'],
+			notes:
+				'Stopnie: zamknięcie drogi → 3, ruch wahadłowy / sygnalizacja / ruch dwukierunkowy na jednej jezdni / awaria mostu / zdarzenie → 2, roboty i ograniczenia → 1. „Zamknięcie” pochodzi z flagi źródła i może dotyczyć tylko jednej jezdni lub części pojazdów.'
+		},
+		{
 			name: 'GUGiK – Państwowy Rejestr Granic (granice województw i powiatów)',
 			url: 'https://www.geoportal.gov.pl/',
 			terms: null,

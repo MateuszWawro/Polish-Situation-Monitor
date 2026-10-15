@@ -128,3 +128,4 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 3. **GIOŚ index → severity:** 0–1→0, 2→1, 3→2, 4–5→3; `-1`/null skipped.
 4. **FIRMS:** uses the public key-less Europe CSV files (found during step 4) – no MAP_KEY needed.
 5. **PRG license** and exact **GIOŚ regulamin URL** still to confirm before prod.
+6. **GDDKiA** (accepted 2026-10-15): open XML feed, mapping as proposed in §6, records without coordinates → whole voivodeship. Poll every 15 min, full download (no ETag shortcut: an unchanged-file response would otherwise close all incidents as missing). Note: the source's `droga_zamknieta` flag is also set for partial closures (one carriageway / heavy vehicles only).

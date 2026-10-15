@@ -5,6 +5,7 @@
 	import MapView from '#lib/MapView.svelte';
 	import {
 		LAYERS,
+		ROAD_ICONS,
 		SEVERITY_COLORS,
 		SEVERITY_LABELS,
 		formatRange,
@@ -116,6 +117,14 @@
 		<ul class="legend" aria-label="Legenda stopni">
 			{#each SEVERITY_LABELS as label, i (label)}
 				<li><span class="swatch" style:background={SEVERITY_COLORS[i]}></span>{label}</li>
+			{/each}
+		</ul>
+		<ul class="legend" aria-label="Legenda dróg">
+			{#each ROAD_ICONS as icon (icon.severity)}
+				<li>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- static SVG constants -->
+					<span class="icon" aria-hidden="true">{@html icon.svg}</span>{icon.label}
+				</li>
 			{/each}
 		</ul>
 		<p class="hint">Kliknij obszar lub punkt, aby zobaczyć szczegóły.</p>
@@ -246,6 +255,12 @@
 		height: 0.9rem;
 		border-radius: 3px;
 		border: 1px solid rgba(0, 0, 0, 0.3);
+		flex: none;
+	}
+	.icon {
+		display: inline-flex;
+		width: 1.1rem;
+		height: 1.1rem;
 		flex: none;
 	}
 	.hint {

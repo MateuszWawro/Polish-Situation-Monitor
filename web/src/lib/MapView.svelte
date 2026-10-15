@@ -5,7 +5,13 @@
 	import type { FeatureCollection } from 'geojson';
 	// Emitted as a build asset: maplibre would otherwise look for the worker next to its chunk.
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-	import { LAYERS, SEVERITY_COLORS, type EventProps, type EventType } from '#lib/events.ts';
+	import {
+		LAYERS,
+		ROAD_ICONS,
+		SEVERITY_COLORS,
+		type EventProps,
+		type EventType
+	} from '#lib/events.ts';
 
 	interface Props {
 		data: Partial<Record<EventType, FeatureCollection>>;
@@ -34,10 +40,24 @@
 		SEVERITY_COLORS[3]
 	] as unknown as string;
 
-	const layerIds = (type: EventType) =>
-		LAYERS.find((l) => l.type === type)?.kind === 'area'
-			? [`${type}-fill`, `${type}-line`]
-			: [`${type}-circle`];
+	const layerIds = (type: EventType) => {
+		const kind = LAYERS.find((l) => l.type === type)?.kind;
+		if (kind === 'area') return [`${type}-fill`, `${type}-line`];
+		return [kind === 'icon' ? `${type}-icon` : `${type}-circle`];
+	};
+	// Draw order: areas, then points, then road icons on top.
+	const DRAW_ORDER = { area: 0, point: 1, icon: 2 };
+
+	async function loadIcons(m: MlMap) {
+		await Promise.all(
+			ROAD_ICONS.map(async ({ severity, svg }) => {
+				const img = new Image(48, 48); // 2× for sharp icons on high-DPI screens
+				img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+				await img.decode();
+				m.addImage(`road-${severity}`, img, { pixelRatio: 2 });
+			})
+		);
+	}
 
 	const darkQuery =
 		typeof window !== 'undefined' ? matchMedia('(prefers-color-scheme: dark)') : null;
@@ -89,15 +109,15 @@
 					new AttributionControl({
 						compact: true,
 						customAttribution: [
-							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GUGiK',
+							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK',
 							'<a href="/zrodla">źródła i licencje</a>'
 						]
 					}),
 					'bottom-left'
 				);
-				m.on('load', () => {
-					// Areas first so points stay on top.
-					for (const layer of [...LAYERS].sort((a) => (a.kind === 'area' ? -1 : 1))) {
+				m.on('load', async () => {
+					await loadIcons(m);
+					for (const layer of [...LAYERS].sort((a, b) => DRAW_ORDER[a.kind] - DRAW_ORDER[b.kind])) {
 						m.addSource(layer.type, {
 							type: 'geojson',
 							data: { type: 'FeatureCollection', features: [] }
@@ -115,6 +135,19 @@
 								type: 'line',
 								source: layer.type,
 								paint: { 'line-color': severityColor, 'line-width': 1.5 }
+							});
+						} else if (layer.kind === 'icon') {
+							m.addLayer({
+								id: `${layer.type}-icon`,
+								type: 'symbol',
+								source: layer.type,
+								layout: {
+									'icon-image': ['concat', 'road-', ['to-string', ['get', 'severity']]],
+									'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 9, 1],
+									'icon-allow-overlap': true,
+									// closures drawn on top of roadworks
+									'symbol-sort-key': ['get', 'severity']
+								}
 							});
 						} else {
 							m.addLayer({
