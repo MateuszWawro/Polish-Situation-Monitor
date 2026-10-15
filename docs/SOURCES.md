@@ -140,7 +140,7 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 
 - **No official source exists** for GNSS interference over Poland. Accepted by the owner as the **only non-official source** on the map, labelled as an estimate.
 - **Endpoint:** `GET https://api.adsb.lol/v2/point/51.9/19.3/250` → `200`, JSON `{"ac": [...], "now": ms, "total": n}`, `cache-control: no-store`. One circle (250 NM = API max, 463 km) covers all of Poland; the farthest corner (Bieszczady) is ~420 km from the centre. ~200 aircraft at 19:20 local time, ~110 usable.
-- **Auth / limits:** no key, no rate-limit headers, none documented ("The API is available to everyone"). Plan: one request every 2 min. Occasional dropped connections seen → covered by the worker's retry.
+- **Auth / limits:** no key, no rate-limit headers, none documented ("The API is available to everyone"). One request per minute (the same response also feeds the aircraft layer, §10). Occasional dropped connections seen → covered by the worker's retry.
 - **License ✅:** ODbL 1.0 (https://www.adsb.lol/docs/open-data/api/). Attribution: „adsb.lol, ODbL 1.0”.
 - **Fields used:** `hex`, `lat`, `lon`, `nac_p` (Navigation Accuracy Category – Position), `version` (ADS-B version), `alt_baro` (`"ground"` on the ground), `seen_pos`, `mlat`/`tisb` (lists of fields derived on the ground).
 - **Method** (gpsjam.org's, over a rolling 60-minute window instead of 24 h):
@@ -152,6 +152,17 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 - **Mapping → `events`:** `source=adsb_lol`, `type=gps_interference`, `source_event_id = row:col` of the cell, geom = cell polygon, TERYT via `ST_Intersects` (cells entirely outside Poland, e.g. over Kaliningrad, are dropped), `valid_from` = when the cell first crossed the threshold, `valid_to` open; the cell is closed when it drops below.
 - **Limits of the estimate:** low NACp can also come from a faulty or old transponder; few aircraft at night → fewer cells; the window is kept in memory, so after an ingest restart it takes up to an hour to fill again.
 
+## 10. adsb.lol – aircraft over Poland (map layer, 2026-10-15)
+
+- Same request as §9 (`/v2/point/51.9/19.3/250`, every 60 s); no extra load on the source.
+- **Stored:** only the latest snapshot in `aircraft` (table replaced on every run) – no tracks or history are kept. API `/api/aircraft` hides positions older than 5 min (e.g. ingest down).
+- **Filtered out:** outside Poland's bbox; `alt_baro = "ground"`; position older than 60 s; category `C*` (surface vehicles, obstacles) and registrations `TWR`/`GND` (airport ground stations reported by some feeders – 20+ per snapshot); **`dbFlags` 4 (PIA) or 8 (FAA LADD)** – owners who asked not to be shown (adsb.lol itself does not filter them).
+- **Classes:**
+  - `military` – `dbFlags & 1` (adsb.lol aircraft database). Checked 2026-10-15: 8 over Poland, e.g. C-17 (RCH), NATO E-3, W-3 (PLF), PZL-130 Orlik, Mi-8. Military aircraft that fly without a transponder are not visible at all.
+  - `commercial` – callsign = ICAO airline designator + flight number (`^[A-Z]{3}\d[0-9A-Z]{0,4}$`, e.g. LOT3AB, RYR12QK) or wake category A3–A6 (≥ 34 t). Includes charter/business-jet operators with airline-style callsigns (e.g. NetJets).
+  - `private` – everything else: light aircraft, helicopters (incl. rescue and police), gliders, unknown.
+- Snapshot 2026-10-15 19:49 local: 96 aircraft over Poland – 74 commercial, 14 private, 8 military.
+
 ## Decisions (accepted 2026-10-15)
 
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
@@ -161,3 +172,4 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 5. **PRG license** and exact **GIOŚ regulamin URL** still to confirm before prod.
 6. **GDDKiA** (accepted 2026-10-15): open XML feed, mapping as proposed in §6. **Records without coordinates are skipped** (changed 2026-10-15): the first choice – assigning them to the whole voivodeship – made 28 incidents show up in 724 powiaty, e.g. S19 roadworks near Dukla listed for the city of Krosno in „Moja okolica”. ~5% of records (33 of 550 on 2026-10-15) are lost; they reappear automatically once GDDKiA adds coordinates. Poll every 15 min, full download (no ETag shortcut: an unchanged-file response would otherwise close all incidents as missing). Note: the source's `droga_zamknieta` flag is also set for partial closures (one carriageway / heavy vehicles only).
 7. **GPS interference** (accepted 2026-10-15): adsb.lol (ODbL) as the one non-official source, method as in §9, layer labelled as an estimate on the map and on `/zrodla`.
+8. **Aircraft layer** (accepted 2026-10-15): adsb.lol snapshot, classes and filters as in §10; latest positions only, LADD/PIA aircraft hidden.

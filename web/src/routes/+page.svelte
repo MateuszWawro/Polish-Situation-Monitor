@@ -25,6 +25,16 @@
 		type EventType,
 		type SourceStatus
 	} from '#lib/events.ts';
+	import {
+		AIRCRAFT_CLASSES,
+		countByClass,
+		formatAltitude,
+		formatSpeed,
+		snapshotTime,
+		type AircraftClass,
+		type AircraftCollection,
+		type AircraftProps
+	} from '#lib/aircraft.ts';
 
 	const EVENTS_REFRESH_MS = 5 * 60_000;
 	const STATUS_REFRESH_MS = 60_000;
@@ -39,6 +49,16 @@
 	let minSeverity = $state(0);
 	let status: SourceStatus[] = $state([]);
 	let selected: EventProps[] = $state([]);
+
+	const AIRCRAFT_REFRESH_MS = 60_000;
+	let aircraft: AircraftCollection | undefined = $state();
+	let aircraftVisible: Record<AircraftClass, boolean> = $state({
+		commercial: true,
+		private: true,
+		military: true
+	});
+	let plane: AircraftProps | null = $state(null);
+	const aircraftCounts = $derived(countByClass(aircraft));
 
 	// Shared link state (?l=…&min=…&c=…&z=…&e=…). Read synchronously so the map starts there.
 	const fromUrl =
@@ -151,6 +171,16 @@
 		loadError = results.some((r) => r.status === 'rejected');
 	}
 
+	async function loadAircraft() {
+		try {
+			// Plain fetch, not the offline cache: positions from an old visit would mislead.
+			const r = await fetch('/api/aircraft');
+			if (r.ok) aircraft = await r.json();
+		} catch {
+			// keep the last snapshot; it is labelled with its age
+		}
+	}
+
 	async function loadStatus() {
 		try {
 			status = await getJson<SourceStatus[]>('/api/sources/status');
@@ -175,7 +205,9 @@
 		urlReady = true;
 		loadEvents();
 		loadStatus();
+		loadAircraft();
 		const timers = [
+			setInterval(loadAircraft, AIRCRAFT_REFRESH_MS),
 			setInterval(loadEvents, EVENTS_REFRESH_MS),
 			setInterval(loadStatus, STATUS_REFRESH_MS),
 			setInterval(() => (now = Date.now()), 30_000)
@@ -196,7 +228,14 @@
 	onmove={(v) => (view = v)}
 	onselect={(events) => {
 		selected = events;
+		plane = null;
 		linkedEvent = undefined;
+	}}
+	{aircraft}
+	{aircraftVisible}
+	onaircraft={(a) => {
+		plane = a;
+		selected = [];
 	}}
 />
 
@@ -259,6 +298,29 @@
 				</label>
 			{/each}
 		</fieldset>
+		<fieldset class="aircraft">
+			<legend class="label">Samoloty</legend>
+			{#each AIRCRAFT_CLASSES as cls (cls.id)}
+				<label class="layer">
+					<input type="checkbox" bind:checked={aircraftVisible[cls.id]} />
+					<span class="layer-body">
+						<span class="layer-head">
+							<strong
+								><span class="plane-dot" style:background={cls.color} aria-hidden="true"
+								></span>{cls.label}</strong
+							>
+							<span class="count mono">{aircraft ? aircraftCounts[cls.id] : '…'}</span>
+						</span>
+						<small>{cls.note}</small>
+					</span>
+				</label>
+			{/each}
+			<small class="src mono" class:ok={!!aircraft?.features.length}>
+				<span class="dot" aria-hidden="true"></span>adsb.lol ·
+				<span class="sr-only">pozycje z:</span>
+				{timeAgo(snapshotTime(aircraft), now)}
+			</small>
+		</fieldset>
 		<p class="label legend-title" aria-hidden="true">Legenda</p>
 		<ul class="legend" aria-label="Legenda stopni">
 			{#each SEVERITY_LABELS as label, i (label)}
@@ -280,6 +342,40 @@
 		</p>
 	</div>
 </aside>
+
+{#if plane}
+	<section class="details" aria-label="Szczegóły samolotu" aria-live="polite">
+		<button class="close" onclick={() => (plane = null)} aria-label="Zamknij szczegóły">✕</button>
+		<h2 class="summary-title label">
+			{AIRCRAFT_CLASSES.find((c) => c.id === plane?.class)?.label ?? 'Samolot'}
+		</h2>
+		<p class="plane-name">
+			{plane.callsign ?? plane.registration ?? plane.hex.toUpperCase()}
+		</p>
+		<dl class="plane-facts">
+			<dt>Rejestracja</dt>
+			<dd class="mono">{plane.registration ?? '—'}</dd>
+			<dt>Typ</dt>
+			<dd class="mono">{plane.aircraft_type ?? '—'}</dd>
+			<dt>Wysokość</dt>
+			<dd class="mono">{formatAltitude(plane.altitude_ft)}</dd>
+			<dt>Prędkość</dt>
+			<dd class="mono">{formatSpeed(plane.speed_kt)}</dd>
+			<dt>Kurs</dt>
+			<dd class="mono">{plane.track === null ? '—' : `${Math.round(plane.track)}°`}</dd>
+			<dt>Pozycja</dt>
+			<dd class="mono">{timeAgo(plane.seen_at, now)}</dd>
+		</dl>
+		<p class="share-view">
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+			<a href={`https://adsb.lol/?icao=${plane.hex}`} rel="noopener">Śledź na adsb.lol ↗</a>
+		</p>
+		<p class="disclaimer">
+			Dane ze społecznościowej sieci odbiorników ADS-B (adsb.lol, ODbL), odświeżane co minutę.
+			Podział na klasy jest przybliżony; wojskowe – według bazy adsb.lol.
+		</p>
+	</section>
+{/if}
 
 {#if selected.length}
 	<section class="details" aria-label="Szczegóły zdarzeń" aria-live="polite">
@@ -453,6 +549,49 @@
 	.count {
 		color: var(--accent);
 		font-size: 0.85rem;
+	}
+	.aircraft {
+		margin-top: 0.6rem;
+		padding-top: 0.6rem;
+		border-top: 1px solid var(--border-strong);
+	}
+	.aircraft legend {
+		margin-bottom: 0.15rem;
+	}
+	.aircraft > .src {
+		display: block;
+		margin-top: 0.25rem;
+		font-size: 0.7rem;
+		color: var(--muted);
+	}
+	.plane-dot {
+		display: inline-block;
+		width: 0.55rem;
+		height: 0.55rem;
+		margin-right: 0.45rem;
+		border-radius: 1px;
+		transform: rotate(45deg);
+		vertical-align: 0.08em;
+	}
+	.plane-name {
+		margin: 0.25rem 0 0.5rem;
+		font-family: var(--mono);
+		font-size: 1.15rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+	}
+	.plane-facts {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.2rem 1rem;
+		margin: 0;
+		font-size: 0.85rem;
+	}
+	.plane-facts dt {
+		color: var(--muted);
+	}
+	.plane-facts dd {
+		margin: 0;
 	}
 	.legend-title {
 		margin: 0.75rem 0 0;

@@ -198,3 +198,22 @@ def test_gps_interference_cells_in_poland_only(conn: psycopg.Connection) -> None
     ).fetchone()
     assert closed == (True,)
     conn.execute("DELETE FROM events WHERE source = 'adsb_lol'")
+
+
+def test_aircraft_snapshot_replaced_each_run(conn: psycopg.Connection) -> None:
+    worker = AdsbGpsWorker(sleep=lambda _: None)
+
+    def run_adsb(aircraft: list[dict[str, Any]]) -> None:
+        with respx.mock, httpx.Client() as client:
+            respx.get(worker.url).mock(return_value=httpx.Response(200, json={"ac": aircraft}))
+            worker.run(conn, client)
+
+    plane = {"lat": 52.2, "lon": 21.0, "alt_baro": 34000, "gs": 450.0, "track": 90.0}
+    run_adsb([{"hex": "a1", "flight": "LOT1 ", **plane}, {"hex": "a2", "dbFlags": 1, **plane}])
+    got = conn.execute("SELECT hex, class, callsign FROM aircraft ORDER BY hex").fetchall()
+    assert got == [("a1", "commercial", "LOT1"), ("a2", "military", None)]
+
+    run_adsb([{"hex": "a3", **plane}])
+    assert conn.execute("SELECT hex, class FROM aircraft").fetchall() == [("a3", "private")]
+    conn.execute("DELETE FROM aircraft")
+    conn.execute("DELETE FROM events WHERE source = 'adsb_lol'")

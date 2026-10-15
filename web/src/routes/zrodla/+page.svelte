@@ -45,13 +45,13 @@
 		},
 		{
 			anchor: 'adsb',
-			name: 'adsb.lol – dane ADS-B samolotów (zakłócenia GPS)',
+			name: 'adsb.lol – samoloty nad Polską i zakłócenia GPS (dane ADS-B)',
 			url: 'https://adsb.lol/',
 			terms: 'https://opendatacommons.org/licenses/odbl/1-0/',
 			termsLabel: 'Licencja ODbL 1.0',
 			attribution: ['Dane lotnicze: adsb.lol (społecznościowa sieć odbiorników ADS-B), ODbL 1.0.'],
 			notes:
-				'Jedyne nieoficjalne źródło na mapie. Samoloty nadają, jak dokładna jest ich pozycja GPS (NACp). Liczymy, jaki odsetek samolotów w kwadracie ok. 55 × 50 km zgłaszał w ostatniej godzinie obniżoną dokładność (NACp < 8), metodą serwisu gpsjam.org: co najmniej 8 samolotów, wynik (złe − 1) / wszystkie. 2–10% → stopień 1, 10–30% → 2, od 30% → 3. To szacunek: wskazuje prawdopodobne zakłócenia, ale ich nie potwierdza – niską dokładność mogą też zgłaszać pojedyncze samoloty z powodu awarii lub starszego sprzętu. Brak kwadratu oznacza brak zakłóceń albo za mało samolotów.'
+				'Jedyne nieoficjalne źródło na mapie. Samoloty nadają, jak dokładna jest ich pozycja GPS (NACp). Liczymy, jaki odsetek samolotów w kwadracie ok. 55 × 50 km zgłaszał w ostatniej godzinie obniżoną dokładność (NACp < 8), metodą serwisu gpsjam.org: co najmniej 8 samolotów, wynik (złe − 1) / wszystkie. 2–10% → stopień 1, 10–30% → 2, od 30% → 3. To szacunek: wskazuje prawdopodobne zakłócenia, ale ich nie potwierdza – niską dokładność mogą też zgłaszać pojedyncze samoloty z powodu awarii lub starszego sprzętu. Brak kwadratu oznacza brak zakłóceń albo za mało samolotów. Warstwa samolotów pokazuje ostatni odczyt (co minutę), bez zapisywania historii lotów. Klasy: wojskowe – według bazy adsb.lol; komercyjne – znak wywoławczy linii lotniczej (np. LOT, RYR) albo duży samolot; pozostałe – awionetki, śmigłowce, szybowce. Pomijamy samoloty, których właściciele zastrzegli widoczność (FAA LADD/PIA), oraz pojazdy i stacje naziemne.'
 		},
 		{
 			anchor: 'prg',

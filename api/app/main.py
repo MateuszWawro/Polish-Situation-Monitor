@@ -16,6 +16,8 @@ from app.db import get_engine
 from app.events import (
     ADMIN_BBOXES_SQL,
     ADMIN_UNITS_SQL,
+    AIRCRAFT_SQL,
+    AIRCRAFT_TTL_S,
     AREAS_SUMMARY_SQL,
     CACHE_TTL_S,
     EVENT_SQL,
@@ -121,6 +123,12 @@ def list_events(
     ttl = min(CACHE_TTL_S[t] for t in (types or EVENT_TYPES))
     key = "events:" + hashlib.sha256(repr(sorted(params.items())).encode()).hexdigest()
     return geojson_response(request, cached_query(key, ttl, EVENTS_SQL, params), ttl)
+
+
+@app.get("/api/aircraft")
+def list_aircraft(request: Request) -> Response:
+    body = cached_query("aircraft", AIRCRAFT_TTL_S, AIRCRAFT_SQL, {})
+    return geojson_response(request, body, AIRCRAFT_TTL_S)
 
 
 @app.get("/api/events/{event_id}")

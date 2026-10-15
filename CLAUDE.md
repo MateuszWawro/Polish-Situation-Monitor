@@ -1,7 +1,7 @@
 # Polish Situation Monitor – project conventions
 
 Hobby, non-commercial, MIT. Situational map of Poland built on official open data (one agreed exception: adsb.lol for
-the GPS interference estimate, see docs/SOURCES.md §9).
+aircraft and the GPS interference estimate, see docs/SOURCES.md §9–10).
 Talk to the owner in Polish; code, names, comments and commits in English.
 
 ## Layout
