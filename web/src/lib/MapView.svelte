@@ -16,6 +16,13 @@
 		type EventType,
 		type LayerDef
 	} from '#lib/events.ts';
+	import {
+		AIRCRAFT_CLASSES,
+		PLANE_SVG,
+		type AircraftClass,
+		type AircraftCollection,
+		type AircraftProps
+	} from '#lib/aircraft.ts';
 
 	interface Props {
 		data: Partial<Record<EventType, FeatureCollection>>;
@@ -32,6 +39,10 @@
 		focus?: Geometry | null;
 		/** User's places ("Moja okolica"); drawn locally, never sent anywhere. */
 		places?: MapPlace[];
+		/** Latest aircraft snapshot and which classes to show. */
+		aircraft?: AircraftCollection;
+		aircraftVisible?: Record<AircraftClass, boolean>;
+		onaircraft?: (aircraft: AircraftProps) => void;
 	}
 	let {
 		data,
@@ -41,7 +52,10 @@
 		initialView,
 		onmove,
 		focus,
-		places = []
+		places = [],
+		aircraft,
+		aircraftVisible,
+		onaircraft
 	}: Props = $props();
 
 	let MarkerCtor: typeof import('maplibre-gl').Marker | undefined;
@@ -86,7 +100,18 @@
 				m.addImage(`road-${severity}`, img, { pixelRatio: 2 });
 			})
 		);
+		const plane = new Image(48, 48);
+		plane.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(PLANE_SVG)}`;
+		await plane.decode();
+		m.addImage('plane', plane, { pixelRatio: 2, sdf: true }); // sdf: tinted per class
 	}
+
+	const aircraftColor = [
+		'match',
+		['get', 'class'],
+		...AIRCRAFT_CLASSES.flatMap((c) => [c.id, c.color]),
+		'#d8dee6'
+	] as unknown as string;
 
 	// OSM has no dark raster style: invert the tiles (brightness-min > max), rotate the
 	// hue back so water stays blue, and mute the colours so event layers stand out.
@@ -211,7 +236,37 @@
 							m.on('mouseleave', id, () => (m.getCanvas().style.cursor = ''));
 						}
 					}
+					// Aircraft on top of everything; rotated to their track, fixed to the map.
+					m.addSource('aircraft', {
+						type: 'geojson',
+						data: { type: 'FeatureCollection', features: [] }
+					});
+					m.addLayer({
+						id: 'aircraft',
+						type: 'symbol',
+						source: 'aircraft',
+						layout: {
+							'icon-image': 'plane',
+							'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.55, 9, 0.9],
+							'icon-rotate': ['coalesce', ['get', 'track'], 0],
+							'icon-rotation-alignment': 'map',
+							'icon-allow-overlap': true
+						},
+						paint: {
+							'icon-color': aircraftColor,
+							'icon-halo-color': '#0a0d12',
+							'icon-halo-width': 1
+						}
+					});
+					m.on('mouseenter', 'aircraft', () => (m.getCanvas().style.cursor = 'pointer'));
+					m.on('mouseleave', 'aircraft', () => (m.getCanvas().style.cursor = ''));
 					m.on('click', (e: MapMouseEvent) => {
+						// A plane over a warning area: the plane is what was aimed at.
+						const plane = m.queryRenderedFeatures(e.point, { layers: ['aircraft'] })[0];
+						if (plane) {
+							onaircraft?.(plane.properties as AircraftProps);
+							return;
+						}
 						const ids = LAYERS.filter((l) => visible[l.id]).flatMap(layerIds);
 						const hits = m.queryRenderedFeatures(e.point, { layers: ids });
 						// One feature per event: a polygon can be hit by both its fill and line layer.
@@ -261,6 +316,13 @@
 				map.setFilter(id, ['>=', ['get', 'severity'], minSeverity]);
 			}
 		}
+	});
+
+	$effect(() => {
+		if (!map || !loaded) return;
+		if (aircraft) (map.getSource('aircraft') as GeoJSONSource).setData(aircraft);
+		const shown = AIRCRAFT_CLASSES.filter((c) => aircraftVisible?.[c.id] ?? true).map((c) => c.id);
+		map.setFilter('aircraft', ['in', ['get', 'class'], ['literal', shown]]);
 	});
 
 	$effect(() => {
