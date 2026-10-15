@@ -1,0 +1,24 @@
+[project]
+name = "psm-ingest"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["apscheduler==3.11.3"]
+
+[project.optional-dependencies]
+dev = ["ruff==0.17.0", "mypy==2.4.0", "pytest==9.1.1"]
+
+[tool.setuptools]
+packages = ["ingest"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
