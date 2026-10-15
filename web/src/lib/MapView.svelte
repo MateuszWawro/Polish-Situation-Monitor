@@ -143,7 +143,7 @@
 					new AttributionControl({
 						compact: true,
 						customAttribution: [
-							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK',
+							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL)',
 							'<a href="/zrodla">źródła i licencje</a>'
 						]
 					}),
@@ -175,7 +175,9 @@
 								source: layer.id,
 								paint: layer.outline
 									? { 'line-color': DROUGHT_COLOR, 'line-width': 2, 'line-dasharray': [3, 2] }
-									: { 'line-color': severityColor, 'line-width': 1.5 }
+									: layer.dotted
+										? { 'line-color': severityColor, 'line-width': 1.5, 'line-dasharray': [1, 1.5] }
+										: { 'line-color': severityColor, 'line-width': 1.5 }
 							});
 						} else if (layer.kind === 'icon') {
 							m.addLayer({

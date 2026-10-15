@@ -3,8 +3,13 @@ import type { FeatureCollection } from 'geojson';
 // Shared types and presentation helpers for events from our API (never from sources directly).
 
 export type EventType =
-	'weather_warning' | 'hydro_warning' | 'air_quality' | 'fire_hotspot' | 'road_incident';
-export type SourceId = 'imgw_meteo' | 'imgw_hydro' | 'gios' | 'firms' | 'gddkia';
+	| 'weather_warning'
+	| 'hydro_warning'
+	| 'air_quality'
+	| 'fire_hotspot'
+	| 'road_incident'
+	| 'gps_interference';
+export type SourceId = 'imgw_meteo' | 'imgw_hydro' | 'gios' | 'firms' | 'gddkia' | 'adsb_lol';
 
 export interface EventProps {
 	id: string;
@@ -40,6 +45,8 @@ export interface LayerDef {
 	match?: (e: { title: string }) => boolean;
 	/** Draw the area as a dashed outline only (no fill). */
 	outline?: boolean;
+	/** Dotted border in the severity colour, to tell estimated areas from official warnings. */
+	dotted?: boolean;
 	/** Short explanation shown under the layer name. */
 	note?: string;
 	defaultVisible?: boolean;
@@ -122,6 +129,18 @@ export const LAYERS: LayerDef[] = [
 		source: 'gddkia',
 		sourceName: 'GDDKiA',
 		kind: 'icon'
+	},
+	{
+		id: 'gps_interference',
+		type: 'gps_interference',
+		dotted: true,
+		sourceAnchor: 'adsb',
+		sourceUrl: 'https://adsb.lol/',
+		label: 'Zakłócenia GPS',
+		note: 'szacunek z danych ADS-B samolotów, ostatnia godzina',
+		source: 'adsb_lol',
+		sourceName: 'adsb.lol',
+		kind: 'area'
 	}
 ];
 
