@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatRange, groupEvents, severityLabel, timeAgo, type EventProps } from './events';
+import {
+	formatInterval,
+	formatRange,
+	groupEvents,
+	severityLabel,
+	sourceHealth,
+	timeAgo,
+	type EventProps,
+	type SourceStatus
+} from './events';
 
 describe('timeAgo', () => {
 	const now = Date.parse('2026-10-15T12:00:00Z');
@@ -48,5 +57,29 @@ describe('groupEvents', () => {
 		expect(groups[0].rows.map((r) => r.severity)).toEqual([3, 1]);
 		expect(groups[1].rows).toHaveLength(1);
 		expect(groups[1].rows[0].events.map((e) => e.id)).toEqual(['1', '2']);
+	});
+});
+
+describe('sourceHealth', () => {
+	const status = (age_s: number, stale = false) =>
+		({
+			source: 'gios',
+			age_s,
+			expected_interval_s: 600,
+			stale,
+			last_success_at: null,
+			last_error: null
+		}) as SourceStatus;
+
+	it('maps age, staleness and the last attempt to a state', () => {
+		expect(sourceHealth(status(300), true)).toBe('ok');
+		expect(sourceHealth(status(300), false)).toBe('delayed'); // last run failed
+		expect(sourceHealth(status(1000), true)).toBe('delayed'); // > 1.5 × 10 min
+		expect(sourceHealth(status(2000, true), true)).toBe('down');
+	});
+
+	it('formats intervals', () => {
+		expect(formatInterval(600)).toBe('co 10 min');
+		expect(formatInterval(3600)).toBe('co 1 godz.');
 	});
 });

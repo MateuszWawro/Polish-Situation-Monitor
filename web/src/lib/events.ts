@@ -19,6 +19,7 @@ export interface EventProps {
 
 export interface SourceStatus {
 	source: SourceId;
+	last_error_at?: string | null;
 	last_success_at: string | null;
 	last_error: string | null;
 	expected_interval_s: number | null;
@@ -28,6 +29,9 @@ export interface SourceStatus {
 
 export interface LayerDef {
 	type: EventType;
+	/** Anchor of the source's section on /zrodla (license and attribution). */
+	sourceAnchor: string;
+	sourceUrl: string;
 	label: string;
 	source: SourceId;
 	sourceName: string;
@@ -37,6 +41,8 @@ export interface LayerDef {
 export const LAYERS: LayerDef[] = [
 	{
 		type: 'weather_warning',
+		sourceAnchor: 'imgw',
+		sourceUrl: 'https://meteo.imgw.pl/',
 		label: 'Ostrzeżenia meteo',
 		source: 'imgw_meteo',
 		sourceName: 'IMGW-PIB',
@@ -44,6 +50,8 @@ export const LAYERS: LayerDef[] = [
 	},
 	{
 		type: 'hydro_warning',
+		sourceAnchor: 'imgw',
+		sourceUrl: 'https://hydro.imgw.pl/',
 		label: 'Ostrzeżenia hydro',
 		source: 'imgw_hydro',
 		sourceName: 'IMGW-PIB',
@@ -51,6 +59,8 @@ export const LAYERS: LayerDef[] = [
 	},
 	{
 		type: 'air_quality',
+		sourceAnchor: 'gios',
+		sourceUrl: 'https://powietrze.gios.gov.pl/',
 		label: 'Jakość powietrza',
 		source: 'gios',
 		sourceName: 'GIOŚ',
@@ -58,12 +68,22 @@ export const LAYERS: LayerDef[] = [
 	},
 	{
 		type: 'fire_hotspot',
+		sourceAnchor: 'firms',
+		sourceUrl: 'https://firms.modaps.eosdis.nasa.gov/',
 		label: 'Punkty cieplne (pożary)',
 		source: 'firms',
 		sourceName: 'NASA FIRMS',
 		kind: 'point'
 	},
-	{ type: 'road_incident', label: 'Drogi', source: 'gddkia', sourceName: 'GDDKiA', kind: 'icon' }
+	{
+		type: 'road_incident',
+		sourceAnchor: 'gddkia',
+		sourceUrl: 'https://www.gov.pl/web/gddkia',
+		label: 'Drogi',
+		source: 'gddkia',
+		sourceName: 'GDDKiA',
+		kind: 'icon'
+	}
 ];
 
 export const SEVERITY_COLORS = ['#2e9d4e', '#e8b420', '#ef7d1a', '#d1242f'];
@@ -156,4 +176,28 @@ export function groupEvents(events: EventProps[]): EventGroup[] {
 	})
 		.filter((g) => g.count)
 		.sort((a, b) => b.rows[0].severity - a.rows[0].severity);
+}
+
+export interface SourceHistory {
+	source: SourceId;
+	days: { date: string; attempts: number; ok: number }[];
+	last_attempt: { at: string; ok: boolean; error: string | null; duration_ms: number } | null;
+}
+
+export type Health = 'ok' | 'delayed' | 'down';
+
+/** down = stale (no success for > 3× interval, as the API decides); delayed = last run failed
+ * or no success for > 1.5× interval; ok otherwise. */
+export function sourceHealth(status: SourceStatus, lastAttemptOk: boolean | null): Health {
+	if (status.stale) return 'down';
+	const late =
+		status.age_s !== null &&
+		status.expected_interval_s !== null &&
+		status.age_s > 1.5 * status.expected_interval_s;
+	return late || lastAttemptOk === false ? 'delayed' : 'ok';
+}
+
+export function formatInterval(seconds: number | null): string {
+	if (!seconds) return '—';
+	return seconds < 3600 ? `co ${Math.round(seconds / 60)} min` : `co ${seconds / 3600} godz.`;
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { LAYERS, timeAgo, type SourceStatus } from '#lib/events.ts';
 
 	let { status, now }: { status: SourceStatus[]; now: number } = $props();
@@ -16,5 +17,6 @@
 			{i ? ', ' : ''}{layerLabel(s.source)} ({sourceName(s.source)}) – ostatnia aktualizacja
 			{timeAgo(s.last_success_at, now)}
 		{/each}.
+		<a href={resolve('/status')}>Szczegóły</a>
 	</p>
 {/if}

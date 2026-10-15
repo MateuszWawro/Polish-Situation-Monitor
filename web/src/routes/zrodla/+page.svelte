@@ -1,6 +1,7 @@
 <script lang="ts">
 	const sources = [
 		{
+			anchor: 'imgw',
 			name: 'IMGW-PIB – ostrzeżenia meteorologiczne i hydrologiczne, stany wód',
 			url: 'https://danepubliczne.imgw.pl/',
 			terms: 'https://danepubliczne.imgw.pl/docs/regulamin_udostepniania_danych.pdf',
@@ -13,6 +14,7 @@
 				'Przetworzenie: ujednolicenie stopni (susza hydrologiczna = stopień 1), przypisanie ostrzeżeń hydro do całych województw, stany wód tylko powyżej stanu ostrzegawczego.'
 		},
 		{
+			anchor: 'gios',
 			name: 'GIOŚ – indeks jakości powietrza',
 			url: 'https://powietrze.gios.gov.pl/',
 			terms: 'https://powietrze.gios.gov.pl/pjp/content/api',
@@ -22,6 +24,7 @@
 				'Indeks 0–5 przeliczony na stopnie 0–3 (bardzo dobry/dobry → 0, umiarkowany → 1, dostateczny → 2, zły/bardzo zły → 3). Dane GIOŚ nie są na bieżąco weryfikowane.'
 		},
 		{
+			anchor: 'firms',
 			name: 'NASA FIRMS – satelitarne wykrycia punktów cieplnych (VIIRS NOAA-20, NOAA-21)',
 			url: 'https://firms.modaps.eosdis.nasa.gov/',
 			terms: 'https://www.earthdata.nasa.gov/data/tools/firms/faq',
@@ -31,6 +34,7 @@
 				'Punkt cieplny to wykrycie satelitarne – nie każdy jest pożarem (np. instalacje przemysłowe). Pewność wykrycia niska/średnia/wysoka → stopień 1/2/3.'
 		},
 		{
+			anchor: 'gddkia',
 			name: 'GDDKiA – utrudnienia na drogach krajowych',
 			url: 'https://www.gov.pl/web/gddkia',
 			terms: 'https://dane.gov.pl/pl/dataset/2752',
@@ -40,6 +44,7 @@
 				'Stopnie: zamknięcie drogi → 3, ruch wahadłowy / sygnalizacja / ruch dwukierunkowy na jednej jezdni / awaria mostu / zdarzenie → 2, roboty i ograniczenia → 1. „Zamknięcie” pochodzi z flagi źródła i może dotyczyć tylko jednej jezdni lub części pojazdów.'
 		},
 		{
+			anchor: 'prg',
 			name: 'GUGiK – Państwowy Rejestr Granic (granice województw i powiatów)',
 			url: 'https://www.geoportal.gov.pl/',
 			terms: null,
@@ -48,6 +53,7 @@
 			notes: 'Geometrie uproszczone na potrzeby mapy (tolerancja ok. 200 m).'
 		},
 		{
+			anchor: 'osm',
 			name: 'OpenStreetMap – podkład mapy',
 			url: 'https://www.openstreetmap.org/',
 			terms: 'https://www.openstreetmap.org/copyright',
@@ -68,7 +74,7 @@
 	</p>
 
 	{#each sources as source (source.name)}
-		<section>
+		<section id={source.anchor}>
 			<h2>{source.name}</h2>
 			{#each source.attribution as line (line)}
 				<p class="attribution">{line}</p>

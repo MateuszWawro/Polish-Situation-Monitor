@@ -39,7 +39,23 @@
 
 {@render children()}
 
+{#if page.url.pathname !== '/'}
+	<footer>
+		<a href={resolve('/status')}>Status źródeł</a> ·
+		<a href={resolve('/zrodla')}>Źródła i licencje</a> ·
+		<a href={resolve('/o-projekcie')}>O projekcie</a>
+	</footer>
+{/if}
+
 <style>
+	footer {
+		max-width: 46rem;
+		margin: 0 auto;
+		padding: 1rem 1rem 2rem;
+		border-top: 1px solid var(--border);
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
 	header {
 		position: fixed;
 		inset: 0 0 auto 0;
