@@ -1,0 +1,84 @@
+[
+ {
+  "opublikowano": "2026-04-17 08:45:56",
+  "stopień": "-1",
+  "data_od": "2026-04-17 08:46:51",
+  "data_do": "9999-12-31 23:59:59",
+  "prawdopodobienstwo": "90",
+  "numer": "21",
+  "biuro": "Biuro Prognoz Hydrologicznych we Wrocławiu, Wydział Prognoz i Opracowań Hydrologicznych w Poznaniu",
+  "zdarzenie": "Susza hydrologiczna",
+  "przebieg": "W związku z występującymi niskimi przepływami wody, w kolejnych dniach w zlewni górnej Warty z Liswartą, spodziewane jest dalsze utrzymywanie się przepływów wody poniżej SNQ.",
+  "komentarz": "Ostrzeżenie wydawane jest w sytuacji, gdy aktualne lub prognozowane wartości przepływu na stacjach wodowskazowych uznanych za reprezentatywne układają się poniżej SNQ przez minimum 10 dni w obrębie jednego obszaru hydrologicznego (który obejmuje grupę zlewni monitorowanych przez PSHM).",
+  "obszary": [
+   {
+    "wojewodztwo": "łódzkie",
+    "opis": "łódzkie, Warta górna z Liswartą, susza hydrologiczna",
+    "kod_zlewni": [
+     "Z_P_LD_1816",
+     "R_P_LD_18_A",
+     "Z_P_LD_18_A"
+    ]
+   },
+   {
+    "wojewodztwo": "opolskie",
+    "opis": "opolskie, Warta górna z Liswartą, susza hydrologiczna",
+    "kod_zlewni": [
+     "Z_P_OP_1816"
+    ]
+   },
+   {
+    "wojewodztwo": "śląskie",
+    "opis": "śląskie, Warta górna z Liswartą, susza hydrologiczna",
+    "kod_zlewni": [
+     "R_P_SL_18",
+     "Z_P_SL_18_B",
+     "Z_P_SL_18_A",
+     "Z_P_SL_1816"
+    ]
+   }
+  ]
+ },
+ {
+  "opublikowano": "2026-04-24 09:25:05",
+  "stopień": "-1",
+  "data_od": "2026-04-24 09:30:00",
+  "data_do": "9999-12-31 23:59:59",
+  "prawdopodobienstwo": "100",
+  "numer": "72",
+  "biuro": "Biuro Prognoz Hydrologicznych w Krakowie, Wydział Prognoz i Opracowań Hydrologicznych w Warszawie",
+  "zdarzenie": "Susza hydrologiczna",
+  "przebieg": "W związku z występującymi niskimi przepływami wody, w kolejnych dniach w zlewni Radomki spodziewane jest dalsze utrzymywanie się przepływów wody poniżej SNQ.",
+  "komentarz": "Ostrzeżenie wydawane jest w sytuacji, gdy aktualne lub prognozowane wartości przepływu na stacjach wodowskazowych uznanych za reprezentatywne układają się poniżej SNQ przez minimum 10 dni w obrębie jednego obszaru hydrologicznego (który obejmuje grupę zlewni monitorowanych przez PSHM).",
+  "obszary": [
+   {
+    "wojewodztwo": "mazowieckie",
+    "opis": "mazowieckie, Radomka, susza hydrologiczna",
+    "kod_zlewni": [
+     "Z_O_MA_252"
+    ]
+   }
+  ]
+ },
+ {
+  "opublikowano": "2026-04-29 09:00:46",
+  "stopień": "-1",
+  "data_od": "2026-04-29 09:01:41",
+  "data_do": "9999-12-31 23:59:59",
+  "prawdopodobienstwo": "90",
+  "numer": "25",
+  "biuro": "Biuro Prognoz Hydrologicznych we Wrocławiu, Wydział Prognoz i Opracowań Hydrologicznych w Poznaniu",
+  "zdarzenie": "Susza hydrologiczna",
+  "przebieg": "W związku z występującymi niskimi przepływami wody, w kolejnych dniach na odcinku Noteci środkowej spodziewane jest dalsze utrzymywanie się przepływów wody poniżej SNQ.",
+  "komentarz": "Ostrzeżenie wydawane jest w sytuacji, gdy aktualne lub prognozowane wartości przepływu na stacjach wodowskazowych uznanych za reprezentatywne układają się poniżej SNQ przez minimum 10 dni w obrębie jednego obszaru hydrologicznego (który obejmuje grupę zlewni monitorowanych przez PSHM).",
+  "obszary": [
+   {
+    "wojewodztwo": "wielkopolskie",
+    "opis": "wielkopolskie, Noteć środkowa, susza hydrologiczna",
+    "kod_zlewni": [
+     "R_P_WP_188"
+    ]
+   }
+  ]
+ }
+]
