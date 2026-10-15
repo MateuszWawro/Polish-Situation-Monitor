@@ -121,6 +121,21 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 - `source_url`: no per-record link; use https://www.gov.pl/web/gddkia (to verify a better public map link).
 - **License:** CC0 1.0 – no attribution required; we will still credit „Źródło: GDDKiA”.
 
+## 7. IOŚ-PIB – air quality forecast ⚠️ (research 2026-10-15, NOT implemented)
+
+- **Endpoint:** `GET https://api.prognozy.ios.edu.pl/v1/{PM10|NO2|O3|SO2}/{TERYT}/` (trailing slash required – without it the server answers **308 → plain `http://`**). Accepts 4-digit powiat and 7-digit gmina codes. `PM25` → 404.
+- **Sample:** `{"20261015": 22.19, "20261016": 30.09, "20261017": 35.1}` – forecast daily mean, µg/m³, today + 2 days. Served as `text/html` although the body is JSON.
+- Advertised by GIOŚ on https://powietrze.gios.gov.pl/pjp/content/api ("Interfejs API Prognoz jakości powietrza … IOŚ-PIB"); questions go to IOŚ-PIB.
+- ⚠️ **TLS:** the server sends only the leaf certificate (`CN=*.zmaik.pl`, SAN includes `api.prognozy.ios.edu.pl`) without the `GEANT TLS RSA 1` intermediate → verification fails in curl/httpx (`unable to verify the first certificate`). Fix on our side would be pinning the official GEANT intermediate in a CA bundle – never disabling verification.
+- ⚠️ **License: unknown.** No terms in the API; https://prognozy.ios.edu.pl/ did not respond (timeout). Not implemented until terms are confirmed.
+- Usable reference threshold (verified via GIOŚ `/v1/rest/levels/getPermissible`): **PM10 daily limit 50 µg/m³** („Poziom dopuszczalny … S24 > 50 ug/m3”). No verified daily thresholds for NO₂/O₃/SO₂.
+
+## 8. IMGW-PIB – water level history (2026-10-15)
+
+- The official API (`/api/data/hydro`, `/api/data/hydro/id/{id}`) returns **only the current measurement**.
+- `https://hydro-back.imgw.pl/station/hydro/status?id=…` (backend of the hydro.imgw.pl map) has series, but it is **not covered by the IMGW data terms** (they name danepubliczne.imgw.pl and meteo.imgw.pl) → not used.
+- **Decision:** keep our own history – the stations worker already reads all 913 stations every 10 min; each new measurement is stored in `water_levels` (7-day retention). Charts start filling from deployment; no backfill.
+
 ## Decisions (accepted 2026-10-15)
 
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
