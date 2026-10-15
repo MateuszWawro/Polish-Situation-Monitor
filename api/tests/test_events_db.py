@@ -75,7 +75,13 @@ def test_event_detail(events: dict[str, uuid.UUID]) -> None:
 
 
 def test_sources_status_lists_all_sources() -> None:
+    # Runs against the shared dev DB: restore the real row afterwards.
     with get_engine().begin() as conn:
+        saved = (
+            conn.execute(text("SELECT * FROM source_status WHERE source = 'imgw_meteo'"))
+            .mappings()
+            .one_or_none()
+        )
         conn.execute(
             text("""
             INSERT INTO source_status (source, last_success_at, expected_interval_s)
@@ -84,10 +90,24 @@ def test_sources_status_lists_all_sources() -> None:
                 expected_interval_s = 600
         """)
         )
-    status = {s["source"]: s for s in client.get("/api/sources/status").json()}
-    assert set(status) == {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia"}
-    assert status["imgw_meteo"]["stale"] is True  # 31 min > 3 × 10 min
-    assert status["imgw_meteo"]["age_s"] >= 31 * 60
+    try:
+        status = {s["source"]: s for s in client.get("/api/sources/status").json()}
+        assert set(status) == {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia"}
+        assert status["imgw_meteo"]["stale"] is True  # 31 min > 3 × 10 min
+        assert status["imgw_meteo"]["age_s"] >= 31 * 60
+    finally:
+        with get_engine().begin() as conn:
+            conn.execute(text("DELETE FROM source_status WHERE source = 'imgw_meteo'"))
+            if saved:
+                conn.execute(
+                    text("""
+                    INSERT INTO source_status (source, last_success_at, last_error,
+                        last_error_at, expected_interval_s)
+                    VALUES (:source, :last_success_at, :last_error, :last_error_at,
+                        :expected_interval_s)
+                """),
+                    dict(saved),
+                )
 
 
 def test_health_checks_database() -> None:
