@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Path, Query, Request, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import TextClause, text
@@ -20,7 +20,9 @@ from app.events import (
     EVENT_SQL,
     EVENT_TYPES,
     EVENTS_SQL,
+    SOURCES_HISTORY_SQL,
     STATUS_SQL,
+    WATER_LEVELS_SQL,
 )
 
 RATE_LIMIT_PER_MIN = 120
@@ -143,6 +145,23 @@ def areas_summary(
         media_type="application/json",
         headers={"Cache-Control": f"public, max-age={ttl}"},
     )
+
+
+@app.get("/api/sources/history")
+def sources_history(request: Request) -> Response:
+    body = cached_query("sources-history", 300, SOURCES_HISTORY_SQL, {})
+    return Response(body, media_type="application/json", headers={"Cache-Control": "max-age=300"})
+
+
+@app.get("/api/hydro/stations/{station_id}/levels")
+def water_levels(
+    station_id: Annotated[str, Path(pattern=r"^\d{6,12}$")],
+    hours: Annotated[int, Query(ge=1, le=168)] = 72,
+) -> Response:
+    body = query_json(WATER_LEVELS_SQL, {"station_id": station_id, "hours": hours})
+    if body is None:
+        raise HTTPException(404, "station not found")
+    return Response(body, media_type="application/json", headers={"Cache-Control": "max-age=300"})
 
 
 @app.get("/api/sources/status")

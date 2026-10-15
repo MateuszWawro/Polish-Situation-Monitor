@@ -123,3 +123,36 @@ def test_areas_summary(events: dict[str, uuid.UUID]) -> None:
     assert "geometry" not in body["1465"][0]
     severities = [e["severity"] for e in body["1465"]]
     assert severities == sorted(severities, reverse=True)
+
+
+def test_sources_history_has_7_days_per_source() -> None:
+    body = client.get("/api/sources/history").json()
+    assert {s["source"] for s in body} == {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia"}
+    for s in body:
+        assert len(s["days"]) == 7
+        assert all(0 <= d["ok"] <= d["attempts"] for d in s["days"])
+
+
+def test_water_levels() -> None:
+    with get_engine().begin() as conn:
+        conn.execute(
+            text("""
+            INSERT INTO hydro_stations (station_id, name, river, warning_cm, alarm_cm)
+            VALUES ('999000001', 'Testowa', 'Wisła', 300, 400) ON CONFLICT DO NOTHING;
+            INSERT INTO water_levels VALUES
+              ('999000001', now() - interval '2 hours', 280),
+              ('999000001', now() - interval '1 hour', 310),
+              ('999000001', now() - interval '100 hours', 200)
+            ON CONFLICT DO NOTHING;
+        """)
+        )
+    try:
+        body = client.get("/api/hydro/stations/999000001/levels?hours=72").json()
+        assert body["warning_cm"] == 300 and body["alarm_cm"] == 400
+        assert [cm for _, cm in body["levels"]] == [280, 310]  # oldest first, 100 h ago excluded
+        assert client.get("/api/hydro/stations/999000002/levels").status_code == 404
+        assert client.get("/api/hydro/stations/abc/levels").status_code == 422
+    finally:
+        with get_engine().begin() as conn:
+            conn.execute(text("DELETE FROM water_levels WHERE station_id = '999000001'"))
+            conn.execute(text("DELETE FROM hydro_stations WHERE station_id = '999000001'"))

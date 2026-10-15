@@ -20,7 +20,8 @@ CACHE_TTL_S = {
 MAX_FEATURES = 5000
 
 PROPERTIES = """
-    'id', id, 'source', source, 'type', type, 'severity', severity, 'title', title,
+    'id', id, 'source', source, 'source_event_id', source_event_id, 'type', type,
+    'severity', severity, 'title', title,
     'description', description, 'teryt_powiat', teryt_powiat, 'valid_from', valid_from,
     'valid_to', valid_to, 'source_url', source_url, 'fetched_at', fetched_at,
     'updated_at', updated_at
@@ -84,6 +85,49 @@ STATUS_SQL = text("""
     ) ORDER BY s.source)::text
     FROM unnest(enum_range(NULL::event_source)) AS s(source)
     LEFT JOIN source_status st ON st.source = s.source
+""")
+
+# /status: per source, per local day of the last 7 days – runs and successful runs.
+SOURCES_HISTORY_SQL = text("""
+    SELECT json_agg(json_build_object(
+        'source', s.source,
+        'days', (
+            SELECT json_agg(json_build_object(
+                'date', d.day, 'attempts', coalesce(a.n, 0), 'ok', coalesce(a.ok, 0)
+            ) ORDER BY d.day)
+            FROM generate_series(
+                (now() AT TIME ZONE 'Europe/Warsaw')::date - 6,
+                (now() AT TIME ZONE 'Europe/Warsaw')::date, interval '1 day') AS d(day)
+            LEFT JOIN (
+                SELECT (started_at AT TIME ZONE 'Europe/Warsaw')::date AS day,
+                       count(*) AS n, count(*) FILTER (WHERE ok) AS ok
+                FROM fetch_attempts
+                WHERE source = s.source AND started_at > now() - interval '8 days'
+                GROUP BY 1
+            ) a ON a.day = d.day::date
+        ),
+        'last_attempt', (
+            SELECT json_build_object('at', started_at, 'ok', ok, 'error', error,
+                                     'duration_ms', duration_ms)
+            FROM fetch_attempts WHERE source = s.source ORDER BY started_at DESC LIMIT 1
+        )
+    ) ORDER BY s.source)::text
+    FROM unnest(enum_range(NULL::event_source)) AS s(source)
+""")
+
+# Water level chart for one gauge (history kept by the ingest worker, 7 days).
+WATER_LEVELS_SQL = text("""
+    SELECT json_build_object(
+        'station_id', st.station_id, 'name', st.name, 'river', st.river,
+        'warning_cm', st.warning_cm, 'alarm_cm', st.alarm_cm,
+        'levels', coalesce((
+            SELECT json_agg(json_build_array(measured_at, level_cm) ORDER BY measured_at)
+            FROM water_levels
+            WHERE station_id = st.station_id
+              AND measured_at > now() - CAST(:hours AS integer) * interval '1 hour'
+        ), '[]'::json)
+    )::text
+    FROM hydro_stations st WHERE st.station_id = :station_id
 """)
 
 ADMIN_UNITS_SQL = text("""
