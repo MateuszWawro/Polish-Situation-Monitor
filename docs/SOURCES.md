@@ -117,7 +117,7 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 - `severity`: `droga_zamknieta` → **3**; `ruch_wahadlowy` / `sygnalizacja_swietlna` / `ruch_2_kierunkowy` / `awaria_mostu` / `typ=W` → **2**; everything else (roadworks, speed limits, narrowing) → **1**. (Matches the brief's examples; 0 unused.)
 - `title` = e.g. „Zamknięcie drogi: A1, Kopytkowo – Warlubie” / „Ruch wahadłowy: DK15 …” / „Roboty drogowe: …”; `description` = `objazd` + limits (`ogr_predkosc`, `ogr_nosnosc`, …) + `km`/`dl`.
 - `valid_from/valid_to` = `data_powstania` / `data_likwidacji` (have explicit offsets).
-- Geometry: **point**; TERYT via `ST_Intersects`. Records without coordinates: assign the whole voivodeship from `woj` (like hydro warnings), or skip them.
+- Geometry: **point**; TERYT via `ST_Intersects`. Records **without coordinates are skipped** (decision below).
 - `source_url`: no per-record link; use https://www.gov.pl/web/gddkia (to verify a better public map link).
 - **License:** CC0 1.0 – no attribution required; we will still credit „Źródło: GDDKiA”.
 
@@ -128,4 +128,4 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 3. **GIOŚ index → severity:** 0–1→0, 2→1, 3→2, 4–5→3; `-1`/null skipped.
 4. **FIRMS:** uses the public key-less Europe CSV files (found during step 4) – no MAP_KEY needed.
 5. **PRG license** and exact **GIOŚ regulamin URL** still to confirm before prod.
-6. **GDDKiA** (accepted 2026-10-15): open XML feed, mapping as proposed in §6, records without coordinates → whole voivodeship. Poll every 15 min, full download (no ETag shortcut: an unchanged-file response would otherwise close all incidents as missing). Note: the source's `droga_zamknieta` flag is also set for partial closures (one carriageway / heavy vehicles only).
+6. **GDDKiA** (accepted 2026-10-15): open XML feed, mapping as proposed in §6. **Records without coordinates are skipped** (changed 2026-10-15): the first choice – assigning them to the whole voivodeship – made 28 incidents show up in 724 powiaty, e.g. S19 roadworks near Dukla listed for the city of Krosno in „Moja okolica”. ~5% of records (33 of 550 on 2026-10-15) are lost; they reappear automatically once GDDKiA adds coordinates. Poll every 15 min, full download (no ETag shortcut: an unchanged-file response would otherwise close all incidents as missing). Note: the source's `droga_zamknieta` flag is also set for partial closures (one carriageway / heavy vehicles only).

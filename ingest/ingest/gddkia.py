@@ -9,7 +9,6 @@ import httpx
 from pydantic import BaseModel, field_validator
 
 from ingest.base import Event, Worker
-from ingest.imgw_hydro import VOIVODESHIPS
 
 LIMITS = {
     "ogr_predkosc": ("ograniczenie prędkości", "km/h"),
@@ -87,6 +86,10 @@ class GddkiaWorker(Worker[RoadIncident]):
         return parse_xml(self.get(client, self.url).content)
 
     def normalize(self, item: RoadIncident) -> Event | None:
+        if item.geo_lat is None or item.geo_long is None:
+            # decision 2026-10-15: skipped – a whole-voivodeship fallback showed incidents in
+            # every powiat of the voivodeship (docs/SOURCES.md §6).
+            return None
         if item.droga_zamknieta:
             severity, label = 3, "Zamknięcie drogi"
         elif flag := next((f for f in RESTRICTIONS if getattr(item, f)), None):
@@ -106,8 +109,6 @@ class GddkiaWorker(Worker[RoadIncident]):
             [item.typ, item.nr_drogi, item.woj, item.km or "", item.data_powstania.isoformat(),
              item.nazwa_odcinka]
         )  # fmt: skip
-        has_point = item.geo_lat is not None and item.geo_long is not None
-        woj = VOIVODESHIPS.get(item.woj.strip().lower())
         return Event(
             source_event_id=hashlib.sha256(key.encode()).hexdigest()[:24],
             type="road_incident",
@@ -117,8 +118,6 @@ class GddkiaWorker(Worker[RoadIncident]):
             valid_from=item.data_powstania,
             valid_to=item.data_likwidacji,
             source_url="https://www.gov.pl/web/gddkia",
-            geom_wkt=f"POINT({item.geo_long} {item.geo_lat})" if has_point else None,
-            # decision 2026-10-15: no coordinates → whole voivodeship (coarse)
-            teryt_powiat=[] if has_point or woj is None else [woj],
+            geom_wkt=f"POINT({item.geo_long} {item.geo_lat})",
             raw=item.model_dump(mode="json"),
         )

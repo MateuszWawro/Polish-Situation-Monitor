@@ -10,8 +10,8 @@ def events() -> list:  # type: ignore[type-arg]
     return [e for i in items if (e := worker.normalize(i))]
 
 
-def test_fixture_parses_all_records() -> None:
-    assert len(events()) == 8
+def test_fixture_parses_all_records_with_coordinates() -> None:
+    assert len(events()) == 7  # 8 in the fixture, 1 without coordinates is skipped
 
 
 def test_severity_mapping() -> None:
@@ -31,14 +31,12 @@ def test_offsets_and_ids() -> None:
     assert evs == events()  # deterministic IDs across runs
 
 
-def test_geometry_or_voivodeship_fallback() -> None:
-    evs = events()
-    with_point = [e for e in evs if e.geom_wkt]
-    without = [e for e in evs if not e.geom_wkt]
-    assert with_point and all(e.teryt_powiat == [] for e in with_point)
-    assert without and all(
-        len(e.teryt_powiat) == 1 and len(e.teryt_powiat[0]) == 2 for e in without
-    )
+def test_every_event_is_a_point_and_records_without_coordinates_are_skipped() -> None:
+    worker = GddkiaWorker()
+    items = worker.validate(parse_xml((FIXTURES / "gddkia_utrdane.xml").read_bytes()))
+    no_coords = [i for i in items if i.geo_lat is None]
+    assert no_coords and all(worker.normalize(i) is None for i in no_coords)
+    assert all(e.geom_wkt.startswith("POINT(") and e.teryt_powiat == [] for e in events())
 
 
 def test_description_has_limits_and_road_names() -> None:
