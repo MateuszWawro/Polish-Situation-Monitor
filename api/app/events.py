@@ -175,3 +175,16 @@ AIRCRAFT_SQL = text("""
     FROM aircraft
     WHERE seen_at > now() - interval '5 minutes'
 """)
+
+# Satellite TLE sets for the map layer, filtered to the requested CelesTrak groups.
+SAT_GROUPS: tuple[str, ...] = ("stations", "visual", "gnss", "starlink")
+SATELLITES_TTL_S = 1800
+SATELLITES_SQL = text("""
+    SELECT json_build_object(
+        'updated_at', max(fetched_at),
+        'satellites', coalesce(json_agg(json_build_object(
+            'norad_id', norad_id, 'name', name, 'group', grp, 'tle1', tle1, 'tle2', tle2
+        ) ORDER BY norad_id), '[]'::json)
+    )::text
+    FROM satellites WHERE grp = ANY(CAST(:groups AS text[]))
+""")

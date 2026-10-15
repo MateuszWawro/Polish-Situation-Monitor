@@ -35,6 +35,13 @@
 		type AircraftCollection,
 		type AircraftProps
 	} from '#lib/aircraft.ts';
+	import {
+		SAT_GROUPS,
+		orbitalPeriodMin,
+		type SatGroup,
+		type SatProps,
+		type SatTle
+	} from '#lib/satellites.ts';
 
 	const EVENTS_REFRESH_MS = 5 * 60_000;
 	const STATUS_REFRESH_MS = 60_000;
@@ -59,6 +66,15 @@
 	});
 	let plane: AircraftProps | null = $state(null);
 	const aircraftCounts = $derived(countByClass(aircraft));
+
+	const SAT_REFRESH_MS = 60 * 60_000; // TLE changes every few hours; one fetch per hour is plenty
+	let satellitesVisible: Record<SatGroup, boolean> = $state(
+		Object.fromEntries(SAT_GROUPS.map((g) => [g.id, g.default])) as Record<SatGroup, boolean>
+	);
+	let satTles: SatTle[] = $state([]);
+	let satUpdatedAt: string | null = $state(null);
+	let satOverPoland = $state(0);
+	let satDetails: SatProps | null = $state(null);
 
 	// Shared link state (?l=…&min=…&c=…&z=…&e=…). Read synchronously so the map starts there.
 	const fromUrl =
@@ -171,6 +187,24 @@
 		loadError = results.some((r) => r.status === 'rejected');
 	}
 
+	async function loadSatellites() {
+		const groups = SAT_GROUPS.filter((g) => satellitesVisible[g.id]).map((g) => g.id);
+		if (!groups.length) {
+			satTles = [];
+			return;
+		}
+		try {
+			const r = await fetch(`/api/satellites?groups=${groups.join(',')}`);
+			if (r.ok) {
+				const body = await r.json();
+				satTles = body.satellites;
+				satUpdatedAt = body.updated_at;
+			}
+		} catch {
+			// keep the last TLE set; positions keep being propagated from it
+		}
+	}
+
 	async function loadAircraft() {
 		try {
 			// Plain fetch, not the offline cache: positions from an old visit would mislead.
@@ -206,8 +240,10 @@
 		loadEvents();
 		loadStatus();
 		loadAircraft();
+		loadSatellites();
 		const timers = [
 			setInterval(loadAircraft, AIRCRAFT_REFRESH_MS),
+			setInterval(loadSatellites, SAT_REFRESH_MS),
 			setInterval(loadEvents, EVENTS_REFRESH_MS),
 			setInterval(loadStatus, STATUS_REFRESH_MS),
 			setInterval(() => (now = Date.now()), 30_000)
@@ -236,7 +272,15 @@
 	onaircraft={(a) => {
 		plane = a;
 		selected = [];
+		satDetails = null;
 	}}
+	satelliteTles={satTles}
+	onsatellite={(sat) => {
+		satDetails = sat;
+		selected = [];
+		plane = null;
+	}}
+	onsatcount={(n) => (satOverPoland = n)}
 />
 
 <div class="banners" aria-live="polite">
@@ -321,6 +365,32 @@
 				{timeAgo(snapshotTime(aircraft), now)}
 			</small>
 		</fieldset>
+		<fieldset class="aircraft">
+			<legend class="label">Satelity nad Polską</legend>
+			{#each SAT_GROUPS as grp (grp.id)}
+				<label class="layer">
+					<input
+						type="checkbox"
+						bind:checked={satellitesVisible[grp.id]}
+						onchange={loadSatellites}
+					/>
+					<span class="layer-body">
+						<span class="layer-head">
+							<strong
+								><span class="plane-dot sat" style:background={grp.color} aria-hidden="true"
+								></span>{grp.label}</strong
+							>
+						</span>
+						<small>{grp.note}</small>
+					</span>
+				</label>
+			{/each}
+			<small class="src mono" class:ok={satTles.length > 0}>
+				<span class="dot" aria-hidden="true"></span>CelesTrak · {satOverPoland} na niebie ·
+				<span class="sr-only">dane z:</span>
+				{timeAgo(satUpdatedAt, now)}
+			</small>
+		</fieldset>
 		<p class="label legend-title" aria-hidden="true">Legenda</p>
 		<ul class="legend" aria-label="Legenda stopni">
 			{#each SEVERITY_LABELS as label, i (label)}
@@ -342,6 +412,38 @@
 		</p>
 	</div>
 </aside>
+
+{#if satDetails}
+	<section class="details" aria-label="Szczegóły satelity" aria-live="polite">
+		<button class="close" onclick={() => (satDetails = null)} aria-label="Zamknij szczegóły"
+			>✕</button
+		>
+		<h2 class="summary-title label">
+			{SAT_GROUPS.find((g) => g.id === satDetails?.group)?.label ?? 'Satelita'}
+		</h2>
+		<p class="plane-name">{satDetails.name}</p>
+		<dl class="plane-facts">
+			<dt>Nr katalogowy</dt>
+			<dd class="mono">{satDetails.norad_id}</dd>
+			<dt>Wysokość</dt>
+			<dd class="mono">{satDetails.altitude_km.toLocaleString('pl-PL')} km</dd>
+			<dt>Prędkość</dt>
+			<dd class="mono">{satDetails.speed_kms} km/s</dd>
+			<dt>Okres obiegu</dt>
+			<dd class="mono">{Math.round(orbitalPeriodMin(satDetails.altitude_km))} min</dd>
+		</dl>
+		<p class="share-view">
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+			<a href={`https://www.n2yo.com/satellite/?s=${satDetails.norad_id}`} rel="noopener"
+				>Śledź na n2yo.com ↗</a
+			>
+		</p>
+		<p class="disclaimer">
+			Pozycja liczona na żywo w przeglądarce z danych orbitalnych CelesTrak (TLE). To punkt pod
+			satelitą (ślad na ziemi), nie widok z orbity.
+		</p>
+	</section>
+{/if}
 
 {#if plane}
 	<section class="details" aria-label="Szczegóły samolotu" aria-live="polite">
@@ -572,6 +674,10 @@
 		border-radius: 1px;
 		transform: rotate(45deg);
 		vertical-align: 0.08em;
+	}
+	.plane-dot.sat {
+		border-radius: 50%;
+		transform: none;
 	}
 	.plane-name {
 		margin: 0.25rem 0 0.5rem;

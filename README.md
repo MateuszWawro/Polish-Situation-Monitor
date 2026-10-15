@@ -17,6 +17,8 @@ Hobby, non-commercial project. MIT licensed. No ads, ever.
   above the warning level.
 - **Aircraft over Poland**, refreshed every minute and split into commercial, private
   and military; only the latest positions are kept, no flight history.
+- **Satellites over Poland**, their ground-track positions propagated live in the browser
+  from CelesTrak orbital data (SGP4); Starlink, stations, bright and GNSS satellites.
 - **Source status** (`/status`) with last successful fetch and 7-day availability.
 - **Offline fallback** – a service worker shows the last loaded state.
 
@@ -30,6 +32,7 @@ Hobby, non-commercial project. MIT licensed. No ads, ever.
 | [GDDKiA](https://dane.gov.pl/pl/dataset/2752) | incidents and roadworks on national roads (CC0) | every 15 min |
 | [GUGiK PRG](https://www.geoportal.gov.pl/) | voivodeship and powiat boundaries | one-off import |
 | [adsb.lol](https://adsb.lol/) | aircraft over Poland and a GPS interference estimate from ADS-B (ODbL, **unofficial**) | every minute |
+| [CelesTrak](https://celestrak.org/) | satellite orbital data (TLE) → positions over Poland, computed in-browser | every 6 h |
 
 Endpoints, limits, licences and mapping decisions are documented in
 [`docs/SOURCES.md`](docs/SOURCES.md).
@@ -112,6 +115,7 @@ Required by the data licences; the site shows the full text and licence links on
 - Źródło: Generalna Dyrekcja Dróg Krajowych i Autostrad.
 - Źródło: Główny Urząd Geodezji i Kartografii, PRG.
 - Dane lotnicze: adsb.lol (społecznościowa sieć odbiorników ADS-B), ODbL 1.0.
+- Dane orbitalne satelitów: CelesTrak (katalog US Space Force).
 - Basemap: © OpenStreetMap contributors (ODbL).
 
 The IMGW terms treat websites with advertising as commercial use, which is why

@@ -186,3 +186,28 @@ def test_aircraft_hides_stale_positions() -> None:
     finally:
         with get_engine().begin() as conn:
             conn.execute(text("DELETE FROM aircraft"))
+
+
+def test_satellites_filtered_by_group() -> None:
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM satellites"))
+        conn.execute(
+            text("""
+            INSERT INTO satellites (norad_id, name, grp, tle1, tle2, fetched_at) VALUES
+              (25544, 'ISS (ZARYA)', 'stations', '1 25544U ...', '2 25544 ...', now()),
+              (99999, 'STARLINK-1', 'starlink', '1 99999U ...', '2 99999 ...', now())
+        """)
+        )
+    try:
+        body = client.get("/api/satellites", params={"groups": "stations"}).json()
+        assert [s["norad_id"] for s in body["satellites"]] == [25544]
+        assert body["satellites"][0]["group"] == "stations"
+        assert body["updated_at"] is not None
+        # default = stations + visual, so the starlink row is excluded
+        assert [s["norad_id"] for s in client.get("/api/satellites").json()["satellites"]] == [
+            25544
+        ]
+        assert client.get("/api/satellites", params={"groups": "moon"}).status_code == 422
+    finally:
+        with get_engine().begin() as conn:
+            conn.execute(text("DELETE FROM satellites"))
