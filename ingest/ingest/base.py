@@ -50,7 +50,10 @@ WITH input AS (
     SELECT
         coalesce(
             ST_GeomFromText(wkt, 4326),
-            (SELECT ST_Union(a.geom) FROM admin_units a
+            -- ±0.002° (~200 m) buffer closes hairline gaps between separately simplified
+            -- powiaty; without it a union keeps hundreds of sliver holes (~10× the JSON).
+            -- shortcut: switch to ST_CoverageSimplify at import once prod runs PostGIS ≥ 3.6.
+            (SELECT ST_Buffer(ST_Buffer(ST_Union(a.geom), 0.002), -0.002) FROM admin_units a
              WHERE a.level = 'powiat'
                AND (a.teryt = ANY(input.teryt) OR left(a.teryt, 2) = ANY(input.teryt)))
         ) AS geom,
