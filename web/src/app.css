@@ -59,3 +59,14 @@ a {
 	margin: 0 auto;
 	padding: calc(var(--header-h) + 1rem) 1rem 3rem;
 }
+
+/* Warning banner (stale sources, load errors) */
+.banner {
+	margin: 0 0 0.5rem;
+	padding: 0.5rem 0.75rem;
+	background: var(--warn-bg);
+	color: var(--warn-fg);
+	border-radius: 8px;
+	font-size: 0.9rem;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}

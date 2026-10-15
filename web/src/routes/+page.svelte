@@ -3,15 +3,13 @@
 	import type { FeatureCollection } from 'geojson';
 	import { resolve } from '$app/paths';
 	import MapView from '#lib/MapView.svelte';
+	import EventGroups from '#lib/EventGroups.svelte';
+	import StaleBanner from '#lib/StaleBanner.svelte';
 	import {
 		LAYERS,
 		ROAD_ICONS,
 		SEVERITY_COLORS,
 		SEVERITY_LABELS,
-		formatDate,
-		formatRange,
-		groupEvents,
-		severityLabel,
 		timeAgo,
 		type EventProps,
 		type EventType,
@@ -41,13 +39,11 @@
 			// storage blocked (private mode): the filter still works for this visit
 		}
 	}
-	const groups = $derived(groupEvents(selected));
 	let loadError = $state(false);
 	let panelOpen = $state(false);
 	let now = $state(Date.now());
 
 	const statusOf = (source: string) => status.find((s) => s.source === source);
-	const stale = $derived(status.filter((s) => s.stale));
 
 	async function loadEvents() {
 		const results = await Promise.allSettled(
@@ -86,10 +82,6 @@
 		];
 		return () => timers.forEach(clearInterval);
 	});
-
-	const layerLabel = (source: string) => LAYERS.find((l) => l.source === source)?.label ?? source;
-	const sourceLabel = (source: string) =>
-		LAYERS.find((l) => l.source === source)?.sourceName ?? source;
 </script>
 
 <svelte:head><title>Monitor sytuacyjny Polski – mapa</title></svelte:head>
@@ -100,15 +92,7 @@
 	{#if loadError}
 		<p class="banner">Nie udało się pobrać części danych. Spróbujemy ponownie za kilka minut.</p>
 	{/if}
-	{#if stale.length}
-		<p class="banner">
-			Dane mogą być nieaktualne:
-			{#each stale as s, i (s.source)}
-				{i ? ', ' : ''}{layerLabel(s.source)} ({sourceLabel(s.source)}) – ostatnia aktualizacja
-				{timeAgo(s.last_success_at, now)}
-			{/each}.
-		</p>
-	{/if}
+	<StaleBanner {status} {now} />
 </div>
 
 <aside class="panel" aria-label="Warstwy i legenda">
@@ -177,46 +161,7 @@
 		<h2 class="summary-title">
 			{selected.length === 1 ? '1 zdarzenie' : `${selected.length} zdarzeń`} w tym miejscu
 		</h2>
-		{#each groups as group (group.layer.type)}
-			<section class="group" aria-label={group.layer.label}>
-				<h3>{group.layer.label} <span class="count">({group.count})</span></h3>
-				{#each group.rows as row (row.key)}
-					{@const single = row.events.length === 1 ? row.events[0] : null}
-					<details open={selected.length === 1}>
-						<summary>
-							<span class="badge" style:background={SEVERITY_COLORS[row.severity]}
-								>{row.severity}</span
-							>
-							<span class="row-title">{row.title}</span>
-							{#if single}
-								<span class="row-until"
-									>{single.valid_to ? `do ${formatDate(single.valid_to)}` : ''}</span
-								>
-							{:else}
-								<span class="row-until">×{row.events.length}</span>
-							{/if}
-						</summary>
-						<div class="body">
-							<p class="sev">{severityLabel(row.severity)}</p>
-							{#each row.events as ev (ev.id)}
-								<div class="item">
-									<p class="meta">Ważność: {formatRange(ev.valid_from, ev.valid_to)}</p>
-									{#if ev.description}<p class="desc">{ev.description}</p>{/if}
-									<p class="meta">
-										Źródło: {sourceLabel(ev.source)}
-										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
-										{#if ev.source_url}· <a href={ev.source_url} target="_blank" rel="noopener"
-												>strona źródła</a
-											>{/if}
-										· aktualizacja {timeAgo(ev.updated_at, now)}
-									</p>
-								</div>
-							{/each}
-						</div>
-					</details>
-				{/each}
-			</section>
-		{/each}
+		<EventGroups events={selected} {now} openAll={selected.length === 1} />
 		<p class="disclaimer">
 			Narzędzie pomocnicze – nie zastępuje Alertów RCB ani komunikatów służb.
 			<a href={resolve('/o-projekcie')}>Więcej</a>
@@ -232,15 +177,6 @@
 		transform: translateX(-50%);
 		z-index: 6;
 		width: min(36rem, calc(100% - 1rem));
-	}
-	.banner {
-		margin: 0 0 0.5rem;
-		padding: 0.5rem 0.75rem;
-		background: var(--warn-bg);
-		color: var(--warn-fg);
-		border-radius: 8px;
-		font-size: 0.9rem;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 	}
 	.panel {
 		position: absolute;
@@ -415,87 +351,6 @@
 	.summary-title {
 		margin: 0.6rem 0 0.25rem;
 		font-size: 1rem;
-	}
-	.group h3 {
-		margin: 0.75rem 0 0.25rem;
-		font-size: 0.85rem;
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
-		color: var(--muted);
-	}
-	details {
-		border-top: 1px solid var(--border);
-	}
-	summary {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		min-height: 44px;
-		padding: 0.35rem 0;
-		cursor: pointer;
-		list-style: none;
-	}
-	summary::-webkit-details-marker {
-		display: none;
-	}
-	summary::after {
-		content: '▸';
-		color: var(--muted);
-		flex: none;
-	}
-	details[open] summary::after {
-		content: '▾';
-	}
-	.badge {
-		flex: none;
-		width: 1.4rem;
-		height: 1.4rem;
-		border-radius: 4px;
-		display: grid;
-		place-items: center;
-		font-size: 0.8rem;
-		font-weight: 700;
-		color: #1b1f24;
-		border: 1px solid rgba(0, 0, 0, 0.3);
-	}
-	.row-title {
-		flex: 1;
-		min-width: 0;
-		font-size: 0.95rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	details[open] .row-title {
-		white-space: normal;
-		font-weight: 600;
-	}
-	.row-until {
-		flex: none;
-		font-size: 0.8rem;
-		color: var(--muted);
-	}
-	.body {
-		padding: 0 0 0.5rem 1.9rem;
-	}
-	.item + .item {
-		border-top: 1px dashed var(--border);
-		margin-top: 0.4rem;
-	}
-	.sev {
-		margin: 0;
-		font-weight: 600;
-		font-size: 0.85rem;
-	}
-	.meta {
-		color: var(--muted);
-		font-size: 0.85rem;
-		margin: 0.25rem 0;
-	}
-	.desc {
-		white-space: pre-line;
-		margin: 0.25rem 0;
-		font-size: 0.95rem;
 	}
 	.disclaimer {
 		font-size: 0.8rem;
