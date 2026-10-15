@@ -46,7 +46,7 @@ data sources ──► ingest ──► PostgreSQL + PostGIS ──► api ─�
 | --- | --- | --- |
 | `ingest/` | Scheduler with one job per source; a failing source never affects the others | Python 3.12, APScheduler, psycopg 3 |
 | `api/` | Read API serving normalised events as GeoJSON | FastAPI, SQLAlchemy 2, GeoAlchemy2, Redis cache |
-| `db/` | Alembic migrations, PRG boundary import, offline place index builder | Alembic, psycopg 3 |
+| `db/` | Alembic migrations, PRG boundary import, offline place index and national outline builders | Alembic, psycopg 3 |
 | `web/` | Map frontend; talks only to `api/`, never to data sources | SvelteKit (adapter-static), MapLibre, TypeScript |
 | `deploy/` | Docker Compose stack | PostgreSQL 18 + PostGIS 3.6, Redis 7.4, Caddy |
 | `docs/` | Source facts and decisions ([`SOURCES.md`](docs/SOURCES.md)), [ADRs](docs/adr/) | |

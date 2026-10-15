@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import type { Map as MlMap, GeoJSONSource, MapMouseEvent } from 'maplibre-gl';
-	import type { FeatureCollection, Geometry } from 'geojson';
+	import type { Feature, FeatureCollection, Geometry } from 'geojson';
 	import { bbox, type MapPlace, type MapViewState } from '#lib/geo.ts';
 	// Emitted as a build asset: maplibre would otherwise look for the worker next to its chunk.
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
@@ -113,6 +113,37 @@
 		'#d8dee6'
 	] as unknown as string;
 
+	// View is locked to Poland: a generous margin leaves a dim frame around the country.
+	const POLAND_MAX_BOUNDS: [[number, number], [number, number]] = [
+		[12.2, 48.4],
+		[26.0, 55.6]
+	];
+	const MASK_COLOR = '#05080c';
+	const BORDER_COLOR = '#5ec8d8';
+
+	/** World box with Poland punched out, to dim everything outside the country. */
+	function maskFeature(poland: Geometry): Feature {
+		// Covers all of Europe – far beyond the locked view, so its edges are never seen.
+		const world = [
+			[-20, 30],
+			[45, 30],
+			[45, 72],
+			[-20, 72],
+			[-20, 30]
+		];
+		const outerRings =
+			poland.type === 'MultiPolygon'
+				? poland.coordinates.map((poly) => poly[0])
+				: poland.type === 'Polygon'
+					? [poland.coordinates[0]]
+					: [];
+		return {
+			type: 'Feature',
+			properties: {},
+			geometry: { type: 'Polygon', coordinates: [world, ...outerRings] }
+		};
+	}
+
 	// OSM has no dark raster style: invert the tiles (brightness-min > max), rotate the
 	// hue back so water stays blue, and mute the colours so event layers stand out.
 	const BASEMAP_PAINT = {
@@ -138,6 +169,8 @@
 				setWorkerUrl(workerUrl);
 				const m = new MapCtor({
 					container,
+					minZoom: 5.3,
+					maxBounds: POLAND_MAX_BOUNDS,
 					...(initialView
 						? { center: initialView.center, zoom: initialView.zoom }
 						: { bounds: POLAND, fitBoundsOptions: { padding: 16 } }),
@@ -176,6 +209,37 @@
 				);
 				m.on('load', async () => {
 					await loadIcons(m);
+					// Poland outline: dim everything else and draw a crisp, softly glowing border.
+					try {
+						const poland = (await (await fetch('/poland.geojson')).json()) as Geometry;
+						m.addSource('poland-outline', { type: 'geojson', data: poland });
+						m.addSource('poland-mask', { type: 'geojson', data: maskFeature(poland) });
+						m.addLayer({
+							id: 'poland-mask',
+							type: 'fill',
+							source: 'poland-mask',
+							paint: { 'fill-color': MASK_COLOR, 'fill-opacity': 0.8 }
+						});
+						m.addLayer({
+							id: 'poland-border-glow',
+							type: 'line',
+							source: 'poland-outline',
+							paint: {
+								'line-color': BORDER_COLOR,
+								'line-width': 6,
+								'line-blur': 6,
+								'line-opacity': 0.25
+							}
+						});
+						m.addLayer({
+							id: 'poland-border',
+							type: 'line',
+							source: 'poland-outline',
+							paint: { 'line-color': BORDER_COLOR, 'line-width': 1.4, 'line-opacity': 0.9 }
+						});
+					} catch {
+						// no outline is fine: the map still works, just without the Poland frame
+					}
 					m.addSource('places', {
 						type: 'geojson',
 						data: { type: 'FeatureCollection', features: [] }

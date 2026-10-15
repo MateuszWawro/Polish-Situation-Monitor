@@ -73,6 +73,7 @@ Verified with real requests on **2026-10-15**. Status legend: ✅ verified · �
 - **Recommended:** WFS `https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WFS/AdministrativeBoundaries` – layers `ms:A01_Granice_wojewodztw`, `ms:A02_Granice_powiatow`. GetFeature works; GML 3.2, **EPSG:2180** (transform to 4326). Attributes: `JPT_KOD_JE` = TERYT (e.g. `1416`), `JPT_NAZWA_` = name.
 - Alternative: full zip `https://opendata.geoportal.gov.pl/prg/granice/00_jednostki_administracyjne.zip` (**377 MB**, shapefiles) – too heavy for a one-off script.
 - **Mapping:** `admin_units(teryt, level, name, geom=ST_SimplifyPreserveTopology(ST_Transform(g,4326), tol))`.
+- **National outline:** `db/build_poland_outline.py` writes `web/static/poland.geojson` (union of voivodeships, buffer-closed and simplified, ~14 KB) – the map dims everything outside Poland and locks the view to it. Re-run after `import_prg.py` when PRG changes.
 - **License ❓:** PRG is generally published free of charge by GUGiK, but **I did not find/confirm a terms page** in this session. Needs a link before going to prod.
 
 ---
