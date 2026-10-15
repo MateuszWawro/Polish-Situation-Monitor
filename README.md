@@ -2,8 +2,8 @@
 
 A situational map of Poland built on official open data: weather and hydrological
 warnings, river levels, air quality, satellite fire hotspots and road incidents,
-shown per powiat and województwo on one map. One layer, possible GPS interference,
-is an estimate from community ADS-B data (see below).
+shown per powiat and województwo on one map. Two layers, aircraft and possible GPS
+interference, come from community ADS-B data (see below).
 
 Hobby, non-commercial project. MIT licensed. No ads, ever.
 
@@ -15,6 +15,8 @@ Hobby, non-commercial project. MIT licensed. No ads, ever.
   the "use my location" lookup stay on the device; the position is never sent.
 - **Event pages** (`/e/<id>`), including a 72-hour water level chart for gauges
   above the warning level.
+- **Aircraft over Poland**, refreshed every minute and split into commercial, private
+  and military; only the latest positions are kept, no flight history.
 - **Source status** (`/status`) with last successful fetch and 7-day availability.
 - **Offline fallback** – a service worker shows the last loaded state.
 
@@ -27,7 +29,7 @@ Hobby, non-commercial project. MIT licensed. No ads, ever.
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS fire hotspots (NOAA-20, NOAA-21), public CSV, no key | every 30 min |
 | [GDDKiA](https://dane.gov.pl/pl/dataset/2752) | incidents and roadworks on national roads (CC0) | every 15 min |
 | [GUGiK PRG](https://www.geoportal.gov.pl/) | voivodeship and powiat boundaries | one-off import |
-| [adsb.lol](https://adsb.lol/) | aircraft ADS-B positions → possible GPS interference estimate (ODbL, **unofficial**) | every 2 min |
+| [adsb.lol](https://adsb.lol/) | aircraft over Poland and a GPS interference estimate from ADS-B (ODbL, **unofficial**) | every minute |
 
 Endpoints, limits, licences and mapping decisions are documented in
 [`docs/SOURCES.md`](docs/SOURCES.md).
