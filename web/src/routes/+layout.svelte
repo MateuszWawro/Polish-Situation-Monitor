@@ -10,12 +10,26 @@
 
 	let { children }: LayoutProps = $props();
 
+	let clock = $state('');
+	// Same zone as every timestamp on the site (events.ts formatDate).
+	const clockFormat = new Intl.DateTimeFormat('pl-PL', {
+		timeZone: 'Europe/Warsaw',
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit',
+		timeZoneName: 'short'
+	});
+
 	onMount(() => {
+		const tick = () => (clock = clockFormat.format(new Date()));
+		tick();
+		const timer = setInterval(tick, 1000);
 		const update = () => (connection.online = navigator.onLine);
 		update();
 		addEventListener('online', update);
 		addEventListener('offline', update);
 		return () => {
+			clearInterval(timer);
 			removeEventListener('online', update);
 			removeEventListener('offline', update);
 		};
@@ -38,7 +52,11 @@
 </svelte:head>
 
 <header>
-	<a class="brand" href={resolve('/')}>Monitor <span class="wide">sytuacyjny</span></a>
+	<a class="brand" href={resolve('/')}>
+		<span class="mark" aria-hidden="true"></span>
+		<span class="code">PSM</span>
+		<span class="name">Monitor <span class="wide">sytuacyjny</span></span>
+	</a>
 	<nav aria-label="Główna nawigacja">
 		{#each links as link (link.path)}
 			<a
@@ -49,6 +67,7 @@
 			</a>
 		{/each}
 	</nav>
+	<time class="clock" aria-hidden="true">{clock}</time>
 </header>
 
 {#if !connection.online || connection.cachedAt}
@@ -78,11 +97,12 @@
 		right: 0;
 		z-index: 9;
 		margin: 0;
-		padding: 0.35rem 0.75rem;
+		padding: 0.3rem 0.75rem;
 		text-align: center;
-		font-size: 0.85rem;
-		background: #3b3f45;
-		color: #fff;
+		font-size: 0.8rem;
+		background: var(--warn-bg);
+		color: var(--warn-fg);
+		border-bottom: 1px solid color-mix(in srgb, var(--warn-fg) 35%, transparent);
 	}
 	footer {
 		max-width: 46rem;
@@ -99,38 +119,100 @@
 		height: var(--header-h);
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
+		gap: 1rem;
 		padding: 0 0.75rem;
-		background: var(--panel);
+		background: var(--panel-solid);
 		border-bottom: 1px solid var(--border);
 	}
 	.brand {
-		font-weight: 700;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 		color: var(--fg);
 		text-decoration: none;
 		white-space: nowrap;
+		font-size: 0.9rem;
+	}
+	/* Pulsing dot: the page refreshes itself, it is "live". */
+	.mark {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background: var(--accent);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+		animation: pulse 2.4s ease-out infinite;
+	}
+	@keyframes pulse {
+		70% {
+			box-shadow: 0 0 0 6px transparent;
+		}
+		100% {
+			box-shadow: 0 0 0 0 transparent;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.mark {
+			animation: none;
+		}
+	}
+	.code {
+		font-family: var(--mono);
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: var(--accent);
+	}
+	.name {
+		color: var(--muted);
+		padding-left: 0.5rem;
+		border-left: 1px solid var(--border-strong);
 	}
 	nav {
 		display: flex;
-		gap: 0.25rem;
+		gap: 0.15rem;
+		margin-left: auto;
+	}
+	.clock {
+		font-family: var(--mono);
+		font-size: 0.8rem;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted);
+		padding-left: 1rem;
+		border-left: 1px solid var(--border);
+		white-space: nowrap;
+	}
+	@media (max-width: 900px) {
+		.clock {
+			display: none;
+		}
 	}
 	@media (max-width: 560px) {
 		.wide {
 			display: none;
 		}
 	}
+	@media (max-width: 680px) {
+		.name {
+			display: none;
+		}
+	}
 	nav a {
 		white-space: nowrap;
-		padding: 0.5rem 0.5rem;
-		color: var(--fg);
+		padding: 0.4rem 0.6rem;
+		color: var(--muted);
 		text-decoration: none;
-		border-radius: 6px;
-		font-size: 0.95rem;
+		border-radius: var(--radius);
+		font-family: var(--mono);
+		font-size: 0.75rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	nav a:hover {
+		color: var(--fg);
 	}
 	nav a[aria-current='page'] {
-		background: color-mix(in srgb, var(--accent) 15%, transparent);
 		color: var(--accent);
+		box-shadow: inset 0 -2px 0 var(--accent);
+		border-radius: 0;
 	}
 	/* Phones: four links need the whole width; "Mapa" already leads home. */
 	@media (max-width: 440px) {
@@ -142,8 +224,9 @@
 			justify-content: space-between;
 		}
 		nav a {
-			padding: 0.5rem 0.35rem;
-			font-size: 0.9rem;
+			padding: 0.5rem 0.3rem;
+			font-size: 0.68rem;
+			letter-spacing: 0.04em;
 		}
 	}
 </style>

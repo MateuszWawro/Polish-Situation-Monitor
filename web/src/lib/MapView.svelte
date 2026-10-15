@@ -88,21 +88,24 @@
 		);
 	}
 
-	const darkQuery =
-		typeof window !== 'undefined' ? matchMedia('(prefers-color-scheme: dark)') : null;
-	// OSM has no dark raster style: dim the tiles instead.
-	const basemapPaint = (dark: boolean) => ({
-		'raster-brightness-max': dark ? 0.55 : 1,
-		'raster-saturation': dark ? -0.5 : 0
-	});
+	// OSM has no dark raster style: invert the tiles (brightness-min > max), rotate the
+	// hue back so water stays blue, and mute the colours so event layers stand out.
+	const BASEMAP_PAINT = {
+		'raster-brightness-min': 0.92,
+		'raster-brightness-max': 0.05,
+		'raster-hue-rotate': 180,
+		'raster-saturation': -0.9,
+		'raster-contrast': -0.05
+	};
+
+	/** Cursor (or map centre on touch) readout, e.g. "52.2297°N 21.0122°E". */
+	let cursor = $state('');
+	let zoomLevel = $state('');
+	const fmt = (lng: number, lat: number) =>
+		`${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lng).toFixed(4)}°${lng >= 0 ? 'E' : 'W'}`;
 
 	onMount(() => {
 		let cancelled = false;
-		const onScheme = () => {
-			if (!map) return;
-			for (const [k, v] of Object.entries(basemapPaint(darkQuery?.matches ?? false)))
-				map.setPaintProperty('osm', k as 'raster-brightness-max', v);
-		};
 		import('maplibre-gl').then(
 			({ Map: MapCtor, Marker, NavigationControl, AttributionControl, setWorkerUrl }) => {
 				MarkerCtor = Marker;
@@ -130,7 +133,7 @@
 								id: 'osm',
 								type: 'raster',
 								source: 'osm',
-								paint: basemapPaint(darkQuery?.matches ?? false)
+								paint: BASEMAP_PAINT
 							}
 						]
 					}
@@ -197,7 +200,7 @@
 									// Small at country zoom (hundreds of stations), larger when zoomed in.
 									'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 9, 7],
 									'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 9, 1.5],
-									'circle-stroke-color': '#ffffff'
+									'circle-stroke-color': '#0a0d12'
 								}
 							});
 						}
@@ -225,15 +228,22 @@
 						const c = m.getCenter();
 						onmove?.({ center: [c.lng, c.lat], zoom: m.getZoom() });
 					});
+					const showCenter = () => {
+						const c = m.getCenter();
+						cursor = fmt(c.lng, c.lat);
+						zoomLevel = m.getZoom().toFixed(1);
+					};
+					m.on('move', showCenter);
+					m.on('mousemove', (e: MapMouseEvent) => (cursor = fmt(e.lngLat.lng, e.lngLat.lat)));
+					m.on('mouseout', showCenter);
+					showCenter();
 					loaded = true;
 				});
 				map = m;
 			}
 		);
-		darkQuery?.addEventListener('change', onScheme);
 		return () => {
 			cancelled = true;
-			darkQuery?.removeEventListener('change', onScheme);
 			map?.remove();
 		};
 	});
@@ -299,11 +309,41 @@
 	role="region"
 	aria-label="Mapa zdarzeń w Polsce"
 ></div>
+{#if cursor}
+	<p class="readout" aria-hidden="true">{cursor}<span>Z {zoomLevel}</span></p>
+{/if}
 
 <style>
 	.map {
 		position: absolute;
 		inset: var(--header-h) 0 0 0;
+	}
+	.readout {
+		position: absolute;
+		right: 3.25rem;
+		bottom: 0.6rem;
+		z-index: 4;
+		margin: 0;
+		padding: 0.2rem 0.5rem;
+		font-family: var(--mono);
+		font-size: 0.72rem;
+		font-variant-numeric: tabular-nums;
+		white-space: pre;
+		color: var(--muted);
+		background: var(--panel);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		pointer-events: none;
+	}
+	.readout span {
+		margin-left: 0.75rem;
+		padding-left: 0.75rem;
+		border-left: 1px solid var(--border);
+	}
+	@media (max-width: 719px) {
+		.readout {
+			display: none;
+		}
 	}
 	/* Marker elements are created outside Svelte, hence :global. */
 	.map :global(.place-pin) {
@@ -311,8 +351,8 @@
 		font-size: 0.85rem;
 		font-weight: 600;
 		padding: 0.2rem 0.55rem;
-		border-radius: 999px;
-		border: 2px solid #fff;
+		border-radius: var(--radius);
+		border: 1px solid #fff;
 		background: var(--place);
 		color: #fff;
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);

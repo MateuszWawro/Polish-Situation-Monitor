@@ -34,7 +34,7 @@
 <style>
 	.disclaimer {
 		border: 2px solid #d1242f;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		padding: 0 1rem;
 		margin: 1rem 0 1.5rem;
 	}

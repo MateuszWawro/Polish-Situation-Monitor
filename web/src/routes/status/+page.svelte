@@ -166,7 +166,7 @@
 	.summary {
 		font-weight: 600;
 		padding: 0.6rem 0.8rem;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: color-mix(in srgb, #2e9d4e 15%, transparent);
 	}
 	.summary.bad {
@@ -175,8 +175,8 @@
 	}
 	.source {
 		border: 1px solid var(--border);
-		border-left: 6px solid #2e9d4e;
-		border-radius: 10px;
+		border-left: 3px solid #2e9d4e;
+		border-radius: var(--radius);
 		padding: 0.75rem 1rem;
 		margin: 1rem 0;
 	}
@@ -204,9 +204,12 @@
 	.state {
 		flex: none;
 		font-weight: 700;
-		font-size: 0.9rem;
 		padding: 0.15rem 0.55rem;
-		border-radius: 999px;
+		border-radius: var(--radius);
+		font-family: var(--mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		background: color-mix(in srgb, #2e9d4e 18%, transparent);
 	}
 	.health-delayed .state {
@@ -233,7 +236,7 @@
 		background: var(--warn-bg);
 		color: var(--warn-fg);
 		padding: 0.4rem 0.6rem;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		overflow-wrap: anywhere;
 	}
 	.week-title {

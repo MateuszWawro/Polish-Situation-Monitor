@@ -1,28 +1,26 @@
+/*
+ * Dark "ops console" look: one dark theme, monospace for data (times, counts,
+ * coordinates, labels), sans-serif for prose. Severity colours stay as they are –
+ * they carry meaning, not decoration.
+ */
 :root {
-	--bg: #ffffff;
-	--fg: #1b1f24;
-	--muted: #59636e;
-	--panel: rgba(255, 255, 255, 0.96);
-	--border: #d0d7de;
-	--accent: #0b62c4;
-	--warn-bg: #fff4d6;
-	--warn-fg: #6b4800;
-	--header-h: 48px;
-	color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--bg: #0f1419;
-		--fg: #e6edf3;
-		--muted: #9aa5b1;
-		--panel: rgba(22, 27, 34, 0.96);
-		--border: #30363d;
-		--accent: #6cb6ff;
-		--warn-bg: #3d2e00;
-		--warn-fg: #ffd97a;
-		color-scheme: dark;
-	}
+	--bg: #0a0d12;
+	--fg: #d8dee6;
+	--muted: #7d8794;
+	--panel: rgba(13, 17, 23, 0.94);
+	--panel-solid: #0d1117;
+	--border: #222a35;
+	--border-strong: #344050;
+	--accent: #5ec8d8;
+	--ok: #3fb950;
+	--warn-bg: #2b2100;
+	--warn-fg: #f2c94c;
+	--header-h: 44px;
+	--radius: 4px;
+	--mono:
+		ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', Menlo, Consolas, 'Liberation Mono',
+		monospace;
+	color-scheme: dark;
 }
 
 * {
@@ -50,23 +48,78 @@ a {
 }
 
 :focus-visible {
-	outline: 3px solid var(--accent);
+	outline: 2px solid var(--accent);
 	outline-offset: 2px;
+}
+
+::selection {
+	background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Small uppercase section label, e.g. "WARSTWY". */
+.label {
+	font-family: var(--mono);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.mono {
+	font-family: var(--mono);
+	font-variant-numeric: tabular-nums;
 }
 
 .page {
 	max-width: 46rem;
 	margin: 0 auto;
-	padding: calc(var(--header-h) + 1rem) 1rem 3rem;
+	padding: calc(var(--header-h) + 1.5rem) 1rem 3rem;
+}
+
+.page h1 {
+	font-size: 1.4rem;
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
+
+.page h2 {
+	font-size: 1.05rem;
 }
 
 /* Warning banner (stale sources, load errors) */
 .banner {
 	margin: 0 0 0.5rem;
-	padding: 0.5rem 0.75rem;
+	padding: 0.45rem 0.75rem;
 	background: var(--warn-bg);
 	color: var(--warn-fg);
-	border-radius: 8px;
-	font-size: 0.9rem;
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+	border: 1px solid color-mix(in srgb, var(--warn-fg) 35%, transparent);
+	border-left-width: 3px;
+	border-radius: var(--radius);
+	font-size: 0.85rem;
+}
+
+/* MapLibre controls: match the panels instead of the default white boxes. */
+.maplibregl-ctrl-group {
+	background: var(--panel) !important;
+	border: 1px solid var(--border);
+	border-radius: var(--radius) !important;
+	box-shadow: none !important;
+}
+.maplibregl-ctrl-group button + button {
+	border-top-color: var(--border) !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+	filter: invert(0.85);
+}
+.maplibregl-ctrl-attrib {
+	background: var(--panel) !important;
+	color: var(--muted);
+	font-size: 0.7rem;
+}
+.maplibregl-ctrl-attrib a {
+	color: var(--muted) !important;
+}
+.maplibregl-ctrl-attrib-button {
+	filter: invert(0.85);
 }

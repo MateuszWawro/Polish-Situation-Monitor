@@ -215,11 +215,12 @@
 		aria-controls="layers-body"
 		onclick={() => (panelOpen = !panelOpen)}
 	>
-		Warstwy i legenda
+		<span class="label">Warstwy i legenda</span>
+		<span class="chev" aria-hidden="true">{panelOpen ? '−' : '+'}</span>
 	</button>
 	<div id="layers-body" hidden={!panelOpen}>
 		<fieldset class="min-sev">
-			<legend>Pokaż od stopnia</legend>
+			<legend class="label">Pokaż od stopnia</legend>
 			<div class="segmented">
 				{#each [0, 1, 2, 3] as level (level)}
 					<label>
@@ -241,17 +242,24 @@
 				{@const st = statusOf(layer.source)}
 				<label class="layer">
 					<input type="checkbox" bind:checked={visible[layer.id]} />
-					<span>
-						<strong>{layer.label}</strong>
-						<span class="count">({countFrom(layerFeatures(layer, data[layer.type])) ?? '…'})</span>
+					<span class="layer-body">
+						<span class="layer-head">
+							<strong>{layer.label}</strong>
+							<span class="count mono"
+								>{countFrom(layerFeatures(layer, data[layer.type])) ?? '…'}</span
+							>
+						</span>
 						{#if layer.note}<small>{layer.note}</small>{/if}
-						<small class:stale={st?.stale}>
-							{layer.sourceName} · aktualizacja: {timeAgo(st?.last_success_at ?? null, now)}
+						<small class="src mono" class:stale={st?.stale} class:ok={st && !st.stale}>
+							<span class="dot" aria-hidden="true"></span>{layer.sourceName} ·
+							<span class="sr-only">aktualizacja:</span>
+							{timeAgo(st?.last_success_at ?? null, now)}
 						</small>
 					</span>
 				</label>
 			{/each}
 		</fieldset>
+		<p class="label legend-title" aria-hidden="true">Legenda</p>
 		<ul class="legend" aria-label="Legenda stopni">
 			{#each SEVERITY_LABELS as label, i (label)}
 				<li><span class="swatch" style:background={SEVERITY_COLORS[i]}></span>{label}</li>
@@ -267,7 +275,7 @@
 		</ul>
 		<p class="hint">Kliknij obszar lub punkt, aby zobaczyć szczegóły.</p>
 		<p class="share-view">
-			<button type="button" class="link" onclick={shareView}>🔗 Udostępnij ten widok</button>
+			<button type="button" class="link" onclick={shareView}>Udostępnij ten widok ↗</button>
 			<span role="status">{shareNote}</span>
 		</p>
 	</div>
@@ -276,7 +284,7 @@
 {#if selected.length}
 	<section class="details" aria-label="Szczegóły zdarzeń" aria-live="polite">
 		<button class="close" onclick={() => (selected = [])} aria-label="Zamknij szczegóły">✕</button>
-		<h2 class="summary-title">
+		<h2 class="summary-title label">
 			{selected.length === 1 ? '1 zdarzenie' : `${selected.length} zdarzeń`} w tym miejscu
 		</h2>
 		<EventGroups events={selected} {now} openAll={selected.length === 1} />
@@ -306,13 +314,17 @@
 		overflow: auto;
 		background: var(--panel);
 		border: 1px solid var(--border);
-		border-radius: 10px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+		border-radius: var(--radius);
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		backdrop-filter: blur(6px);
 	}
 	.banners:not(:empty) ~ .panel {
 		top: calc(var(--header-h) + 4.5rem);
 	}
 	.panel-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		width: 100%;
 		min-height: 44px;
 		padding: 0.5rem 0.75rem;
@@ -320,9 +332,12 @@
 		background: none;
 		color: var(--fg);
 		font: inherit;
-		font-weight: 600;
 		text-align: left;
 		cursor: pointer;
+	}
+	.chev {
+		font-family: var(--mono);
+		color: var(--muted);
 	}
 	#layers-body {
 		padding: 0 0.75rem 0.75rem;
@@ -336,14 +351,12 @@
 		margin-bottom: 0.5rem;
 	}
 	.min-sev legend {
-		font-size: 0.85rem;
-		color: var(--muted);
-		margin-bottom: 0.25rem;
+		margin-bottom: 0.35rem;
 	}
 	.segmented {
 		display: flex;
-		border: 1px solid var(--border);
-		border-radius: 8px;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.segmented label {
@@ -359,17 +372,19 @@
 	}
 	.segmented span {
 		display: block;
-		min-height: 36px;
-		line-height: 36px;
+		min-height: 32px;
+		line-height: 32px;
 		text-align: center;
-		font-size: 0.9rem;
+		font-family: var(--mono);
+		font-size: 0.78rem;
+		color: var(--muted);
 	}
 	.segmented label + label span {
 		border-left: 1px solid var(--border);
 	}
 	.segmented input:checked + span {
-		background: var(--accent);
-		color: var(--bg);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		color: var(--accent);
 		font-weight: 600;
 	}
 	.segmented input:focus-visible + span {
@@ -378,33 +393,79 @@
 	}
 	.layer {
 		display: flex;
-		gap: 0.5rem;
+		gap: 0.6rem;
 		align-items: flex-start;
-		padding: 0.35rem 0;
+		padding: 0.45rem 0;
 		cursor: pointer;
 	}
+	.layer + .layer {
+		border-top: 1px solid var(--border);
+	}
 	.layer input {
-		width: 1.2rem;
-		height: 1.2rem;
+		width: 1rem;
+		height: 1rem;
 		margin-top: 0.2rem;
+		accent-color: var(--accent);
+	}
+	.layer-body {
+		flex: 1;
+		min-width: 0;
+	}
+	.layer-head {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		font-size: 0.92rem;
+	}
+	.layer-head strong {
+		font-weight: 600;
 	}
 	.layer small {
 		display: block;
 		color: var(--muted);
+		font-size: 0.78rem;
+	}
+	.layer small.src {
+		font-size: 0.7rem;
+		margin-top: 0.1rem;
+	}
+	.dot {
+		display: inline-block;
+		width: 0.4rem;
+		height: 0.4rem;
+		margin-right: 0.4rem;
+		border-radius: 50%;
+		background: var(--muted);
+		vertical-align: 0.1em;
+	}
+	.src.ok .dot {
+		background: var(--ok);
 	}
 	.layer small.stale {
 		color: var(--warn-fg);
-		font-weight: 600;
+	}
+	.src.stale .dot {
+		background: var(--warn-fg);
 	}
 	.count {
-		color: var(--muted);
+		color: var(--accent);
+		font-size: 0.85rem;
+	}
+	.legend-title {
+		margin: 0.75rem 0 0;
+		padding-top: 0.6rem;
+		border-top: 1px solid var(--border-strong);
 	}
 	.legend {
 		list-style: none;
-		padding: 0.5rem 0 0;
-		margin: 0.5rem 0 0;
+		padding: 0.35rem 0 0;
+		margin: 0;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+	.legend + .legend {
+		margin-top: 0.35rem;
 		border-top: 1px solid var(--border);
-		font-size: 0.9rem;
 	}
 	.legend li {
 		display: flex;
@@ -413,10 +474,9 @@
 	}
 	.swatch {
 		display: inline-block;
-		width: 0.9rem;
-		height: 0.9rem;
-		border-radius: 3px;
-		border: 1px solid rgba(0, 0, 0, 0.3);
+		width: 0.75rem;
+		height: 0.75rem;
+		border-radius: 2px;
 		flex: none;
 	}
 	.icon {
@@ -430,7 +490,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		margin: 0.25rem 0 0;
-		font-size: 0.85rem;
+		font-size: 0.8rem;
 		color: var(--muted);
 	}
 	.link {
@@ -443,7 +503,7 @@
 		cursor: pointer;
 	}
 	.hint {
-		font-size: 0.85rem;
+		font-size: 0.78rem;
 		color: var(--muted);
 		margin: 0.5rem 0 0;
 	}
@@ -456,10 +516,10 @@
 		max-height: 55%;
 		overflow: auto;
 		padding: 0.75rem 1rem 1rem;
-		background: var(--panel);
-		border-top: 1px solid var(--border);
-		border-radius: 12px 12px 0 0;
-		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.25);
+		background: var(--panel-solid);
+		border-top: 1px solid var(--border-strong);
+		border-radius: var(--radius) var(--radius) 0 0;
+		box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.45);
 	}
 	@media (min-width: 720px) {
 		.details {
@@ -470,7 +530,7 @@
 			width: 24rem;
 			max-height: calc(100% - var(--header-h) - 3rem);
 			border: 1px solid var(--border);
-			border-radius: 10px;
+			border-radius: var(--radius);
 		}
 	}
 	.close {
@@ -484,11 +544,11 @@
 		cursor: pointer;
 	}
 	.summary-title {
-		margin: 0.6rem 0 0.25rem;
-		font-size: 1rem;
+		margin: 0.9rem 0 0.25rem;
+		color: var(--accent);
 	}
 	.disclaimer {
-		font-size: 0.8rem;
+		font-size: 0.75rem;
 		color: var(--muted);
 		margin-top: 0.75rem;
 	}
