@@ -39,6 +39,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
-		"maplibre-gl": "6.14.0"
+		"maplibre-gl": "6.14.0",
+		"satellite.js": "6.0.1"
 	}
 }

@@ -23,6 +23,14 @@
 		type AircraftCollection,
 		type AircraftProps
 	} from '#lib/aircraft.ts';
+	import {
+		SAT_GROUPS,
+		parseEntries,
+		positionsAt,
+		type SatEntry,
+		type SatProps,
+		type SatTle
+	} from '#lib/satellites.ts';
 
 	interface Props {
 		data: Partial<Record<EventType, FeatureCollection>>;
@@ -43,6 +51,11 @@
 		aircraft?: AircraftCollection;
 		aircraftVisible?: Record<AircraftClass, boolean>;
 		onaircraft?: (aircraft: AircraftProps) => void;
+		/** TLEs of the satellites to show (already filtered to enabled groups). */
+		satelliteTles?: SatTle[];
+		onsatellite?: (sat: SatProps) => void;
+		/** Count of satellites currently over Poland, emitted each tick. */
+		onsatcount?: (n: number) => void;
 	}
 	let {
 		data,
@@ -55,8 +68,32 @@
 		places = [],
 		aircraft,
 		aircraftVisible,
-		onaircraft
+		onaircraft,
+		satelliteTles = [],
+		onsatellite,
+		onsatcount
 	}: Props = $props();
+
+	// Parsed SGP4 records; rebuilt only when the TLE set changes, then propagated every second.
+	// Rebuilt only when the TLE set changes, then propagated every second.
+	const satEntries: SatEntry[] = $derived(parseEntries(satelliteTles));
+	let satTimer: ReturnType<typeof setInterval> | undefined;
+
+	/** Propagate ~every second (a LEO satellite moves ~7.5 km/s, so slower looks jumpy);
+	 *  on phones, ease off to 2 s when many satellites are tracked (e.g. Starlink on). */
+	function startSatellites(m: MlMap): void {
+		const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 719px)').matches;
+		const tick = () => {
+			const src = m.getSource('satellites') as GeoJSONSource | undefined;
+			if (src) {
+				const fc = positionsAt(satEntries, new Date(), POLAND_MAX_BOUNDS);
+				src.setData(fc);
+				onsatcount?.(fc.features.length);
+			}
+			satTimer = setTimeout(tick, phone && satEntries.length > 2000 ? 2000 : 1000);
+		};
+		tick();
+	}
 
 	let MarkerCtor: typeof import('maplibre-gl').Marker | undefined;
 	let markers: import('maplibre-gl').Marker[] = [];
@@ -105,6 +142,13 @@
 		await plane.decode();
 		m.addImage('plane', plane, { pixelRatio: 2, sdf: true }); // sdf: tinted per class
 	}
+
+	const satColor = [
+		'match',
+		['get', 'group'],
+		...SAT_GROUPS.flatMap((g) => [g.id, g.color]),
+		'#d8dee6'
+	] as unknown as string;
 
 	const aircraftColor = [
 		'match',
@@ -201,7 +245,7 @@
 					new AttributionControl({
 						compact: true,
 						customAttribution: [
-							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL)',
+							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL), CelesTrak',
 							'<a href="/zrodla">źródła i licencje</a>'
 						]
 					}),
@@ -324,7 +368,31 @@
 					});
 					m.on('mouseenter', 'aircraft', () => (m.getCanvas().style.cursor = 'pointer'));
 					m.on('mouseleave', 'aircraft', () => (m.getCanvas().style.cursor = ''));
+					// Satellites on the very top; positions recomputed every second (see startSatellites).
+					m.addSource('satellites', {
+						type: 'geojson',
+						data: { type: 'FeatureCollection', features: [] }
+					});
+					m.addLayer({
+						id: 'satellites',
+						type: 'circle',
+						source: 'satellites',
+						paint: {
+							'circle-color': satColor,
+							'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 9, 4.5],
+							'circle-stroke-width': 1,
+							'circle-stroke-color': 'rgba(230,237,243,0.7)',
+							'circle-opacity': 0.95
+						}
+					});
+					m.on('mouseenter', 'satellites', () => (m.getCanvas().style.cursor = 'pointer'));
+					m.on('mouseleave', 'satellites', () => (m.getCanvas().style.cursor = ''));
 					m.on('click', (e: MapMouseEvent) => {
+						const sat = m.queryRenderedFeatures(e.point, { layers: ['satellites'] })[0];
+						if (sat) {
+							onsatellite?.(sat.properties as unknown as SatProps);
+							return;
+						}
 						// A plane over a warning area: the plane is what was aimed at.
 						const plane = m.queryRenderedFeatures(e.point, { layers: ['aircraft'] })[0];
 						if (plane) {
@@ -359,12 +427,14 @@
 					m.on('mouseout', showCenter);
 					showCenter();
 					loaded = true;
+					startSatellites(m);
 				});
 				map = m;
 			}
 		);
 		return () => {
 			cancelled = true;
+			if (satTimer) clearTimeout(satTimer);
 			map?.remove();
 		};
 	});

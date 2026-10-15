@@ -44,6 +44,16 @@
 				'Stopnie: zamknięcie drogi → 3, ruch wahadłowy / sygnalizacja / ruch dwukierunkowy na jednej jezdni / awaria mostu / zdarzenie → 2, roboty i ograniczenia → 1. „Zamknięcie” pochodzi z flagi źródła i może dotyczyć tylko jednej jezdni lub części pojazdów.'
 		},
 		{
+			anchor: 'celestrak',
+			name: 'CelesTrak – dane orbitalne satelitów (TLE)',
+			url: 'https://celestrak.org/',
+			terms: 'https://celestrak.org/usage-policy.php',
+			termsLabel: 'Polityka użycia CelesTrak',
+			attribution: ['Dane orbitalne satelitów: CelesTrak (katalog US Space Force).'],
+			notes:
+				'Elementy orbitalne (TLE) grup: stacje kosmiczne, jasne (widoczne), GNSS i Starlink. Pozycje satelitów liczone są na żywo w Twojej przeglądarce (SGP4), nie na serwerze – satelity poruszają się ~7,5 km/s. Na mapie pokazujemy punkt podsatelitarny (ślad na ziemi) tych, które są aktualnie nad Polską, a nie widok z orbity.'
+		},
+		{
 			anchor: 'adsb',
 			name: 'adsb.lol – samoloty nad Polską i zakłócenia GPS (dane ADS-B)',
 			url: 'https://adsb.lol/',
