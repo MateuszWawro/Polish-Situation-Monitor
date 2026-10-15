@@ -121,7 +121,7 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 - `source_url`: no per-record link; use https://www.gov.pl/web/gddkia (to verify a better public map link).
 - **License:** CC0 1.0 – no attribution required; we will still credit „Źródło: GDDKiA”.
 
-## 7. IOŚ-PIB – air quality forecast ⚠️ (research 2026-10-15, NOT implemented)
+## 7. IOŚ-PIB – air quality forecast ❌ (research 2026-10-15, dropped by the owner the same day)
 
 - **Endpoint:** `GET https://api.prognozy.ios.edu.pl/v1/{PM10|NO2|O3|SO2}/{TERYT}/` (trailing slash required – without it the server answers **308 → plain `http://`**). Accepts 4-digit powiat and 7-digit gmina codes. `PM25` → 404.
 - **Sample:** `{"20261015": 22.19, "20261016": 30.09, "20261017": 35.1}` – forecast daily mean, µg/m³, today + 2 days. Served as `text/html` although the body is JSON.
