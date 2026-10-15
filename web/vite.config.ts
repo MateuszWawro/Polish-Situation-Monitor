@@ -13,6 +13,8 @@ export default defineConfig({
 			adapter: adapter({ fallback: '200.html' })
 		})
 	],
+	// Dev only: in prod Caddy serves the static build and proxies /api.
+	server: { proxy: { '/api': 'http://localhost:8000' } },
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
