@@ -157,11 +157,39 @@
 		'#d8dee6'
 	] as unknown as string;
 
-	// View is locked to Poland: a generous margin leaves a dim frame around the country.
+	// Rough box around Poland for the satellite filter (the map's own limits are computed per
+	// screen size in lockToPoland).
 	const POLAND_MAX_BOUNDS: [[number, number], [number, number]] = [
 		[12.2, 48.4],
 		[26.0, 55.6]
 	];
+
+	/** Room for the floating layers panel on wide screens, so it doesn't cover western Poland. */
+	const fitPadding = (width: number) => {
+		const side = width >= 1000 ? 340 : 16;
+		return { top: 24, bottom: 24, left: side, right: 16 };
+	};
+
+	/** Whole Poland in frame is both the start view and the furthest zoom-out; panning can't
+	 * leave that frame. Recomputed on resize (e.g. phone rotation). */
+	function lockToPoland(m: MlMap, jumpToPoland: boolean) {
+		const camera = m.cameraForBounds(POLAND, { padding: fitPadding(m.getContainer().clientWidth) });
+		if (!camera?.center || camera.zoom === undefined) return;
+		const previous = { center: m.getCenter(), zoom: m.getZoom() };
+		m.setMaxBounds(null);
+		m.setMinZoom(null);
+		m.jumpTo(camera);
+		const frame = m.getBounds();
+		if (!jumpToPoland) m.jumpTo(previous);
+		m.setMinZoom(camera.zoom);
+		m.setMaxBounds(frame);
+	}
+
+	/** Keep the outside-Poland mask and the border above every data layer. */
+	function raiseFrame(m: MlMap) {
+		for (const id of ['poland-mask', 'poland-border-glow', 'poland-border'])
+			if (m.getLayer(id)) m.moveLayer(id);
+	}
 	const MASK_COLOR = '#05080c';
 	const BORDER_COLOR = '#5ec8d8';
 
@@ -213,11 +241,9 @@
 				setWorkerUrl(workerUrl);
 				const m = new MapCtor({
 					container,
-					minZoom: 5.3,
-					maxBounds: POLAND_MAX_BOUNDS,
 					...(initialView
 						? { center: initialView.center, zoom: initialView.zoom }
-						: { bounds: POLAND, fitBoundsOptions: { padding: 16 } }),
+						: { bounds: POLAND, fitBoundsOptions: { padding: fitPadding(container.clientWidth) } }),
 					attributionControl: false,
 					style: {
 						version: 8,
@@ -262,7 +288,8 @@
 							id: 'poland-mask',
 							type: 'fill',
 							source: 'poland-mask',
-							paint: { 'fill-color': MASK_COLOR, 'fill-opacity': 0.8 }
+							// Opaque: nothing outside Poland is shown (raised above data in raiseFrame).
+							paint: { 'fill-color': MASK_COLOR, 'fill-opacity': 1 }
 						});
 						m.addLayer({
 							id: 'poland-border-glow',
@@ -426,6 +453,9 @@
 					m.on('mousemove', (e: MapMouseEvent) => (cursor = fmt(e.lngLat.lng, e.lngLat.lat)));
 					m.on('mouseout', showCenter);
 					showCenter();
+					raiseFrame(m);
+					lockToPoland(m, !initialView);
+					m.on('resize', () => lockToPoland(m, false));
 					loaded = true;
 					startSatellites(m);
 				});
@@ -476,6 +506,7 @@
 				source: 'places',
 				paint: { 'line-color': PLACE_COLOR, 'line-width': 2.5, 'line-opacity': 0.9 }
 			});
+		raiseFrame(m);
 		(m.getSource('places') as GeoJSONSource).setData({
 			type: 'FeatureCollection',
 			features: places
