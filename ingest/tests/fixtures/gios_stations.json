@@ -1,0 +1,82 @@
+{
+ "@context": {
+  "Lista stacji pomiarów": {
+   "@id": "https://api.gios.gov.pl/pjp-api/v1/rest/station/findAll"
+  },
+  "links": "https://schema.org/relatedLink",
+  "totalPages": "https://schema.org/numberOfPages"
+ },
+ "Lista stacji pomiarowych": [
+  {
+   "Identyfikator stacji": 11,
+   "Kod stacji": "DsCzerStraza",
+   "Nazwa stacji": "Czerniawa",
+   "WGS84 φ N": "50.912475",
+   "WGS84 λ E": "15.312190",
+   "Identyfikator miasta": 142,
+   "Nazwa miasta": "Czerniawa",
+   "Gmina": "Świeradów-Zdrój",
+   "Powiat": "lubański",
+   "Województwo": "DOLNOŚLĄSKIE",
+   "Ulica": "ul. Strażacka 7"
+  },
+  {
+   "Identyfikator stacji": 16,
+   "Kod stacji": "DsDziePilsud",
+   "Nazwa stacji": "Dzierżoniów, ul. Piłsudskiego",
+   "WGS84 φ N": "50.732817",
+   "WGS84 λ E": "16.648050",
+   "Identyfikator miasta": 198,
+   "Nazwa miasta": "Dzierżoniów",
+   "Gmina": "Dzierżoniów",
+   "Powiat": "dzierżoniowski",
+   "Województwo": "DOLNOŚLĄSKIE",
+   "Ulica": "ul. Piłsudskiego 26"
+  },
+  {
+   "Identyfikator stacji": 38,
+   "Kod stacji": "DsKlodzSzkol",
+   "Nazwa stacji": "Kłodzko, ul. Szkolna",
+   "WGS84 φ N": "50.433493",
+   "WGS84 λ E": "16.653660",
+   "Identyfikator miasta": 368,
+   "Nazwa miasta": "Kłodzko",
+   "Gmina": "Kłodzko",
+   "Powiat": "kłodzki",
+   "Województwo": "DOLNOŚLĄSKIE",
+   "Ulica": "ul. Szkolna 8"
+  }
+ ],
+ "meta": {
+  "dc:description": "Usługa sieciowa udostępniająca listę funkcjonujących stacji pomiarowych",
+  "sy:updateFrequency": "1",
+  "dc:language": "pol (ISO 639-2 / ISO 639-3)",
+  "schema:contentType": "application/ld+json",
+  "schema:provider": {
+   "@context": "https://schema.org",
+   "@type": "Organization",
+   "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Warszawa",
+    "postalCode": "02-362",
+    "streetAddress": "Bitwy Warszawskiej 1920 3"
+   },
+   "email": "api@gios.gov.pl",
+   "name": "Główny Inspektorat Ochrony Środowiska"
+  },
+  "schema:dateModified": "do uzupełnienia po publikacji (ISO 8601)",
+  "dc:title": "Lista stacji pomiarowych",
+  "schema:datePublished": "10.04.2017",
+  "schema:keywords": "powietrze, jakość powietrza, zanieczyszczenie powietrza, stacje pomiarowe, stanowiska pomiarowe, monitoring powietrza, Państwowy Monitoring Środowiska, środowisko, stan środowiska",
+  "sy:updatePeriod": "year",
+  "schema:isPartOf": "Państwowy Monitoring Środowiska, Jakość powietrza"
+ },
+ "links": {
+  "next": "https://api.gios.gov.pl/pjp-api/v1/rest/station/findAll?size=500&page=1&size=500",
+  "last": "https://api.gios.gov.pl/pjp-api/v1/rest/station/findAll?size=500&page=0&size=500",
+  "prev": "https://api.gios.gov.pl/pjp-api/v1/rest/station/findAll?size=500&page=0&size=500",
+  "self": "https://api.gios.gov.pl/pjp-api/v1/rest/station/findAll?size=500&page=0&size=500",
+  "first": "https://api.gios.gov.pl/pjp-api/v1/rest/station/findAll?size=500&page=0&size=500"
+ },
+ "totalPages": 1
+}
