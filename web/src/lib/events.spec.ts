@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	LAYERS,
 	formatInterval,
+	inLayer,
 	formatRange,
 	groupEvents,
 	severityLabel,
@@ -81,5 +83,20 @@ describe('sourceHealth', () => {
 	it('formats intervals', () => {
 		expect(formatInterval(600)).toBe('co 10 min');
 		expect(formatInterval(3600)).toBe('co 1 godz.');
+	});
+});
+
+describe('drought layer', () => {
+	it('splits drought from other hydro warnings', () => {
+		const hydro = LAYERS.find((l) => l.id === 'hydro_warning')!;
+		const drought = LAYERS.find((l) => l.id === 'drought')!;
+		const dry = { type: 'hydro_warning' as const, title: 'Susza hydrologiczna' };
+		const flood = {
+			type: 'hydro_warning' as const,
+			title: 'Wezbranie z przekroczeniem stanów alarmowych'
+		};
+		expect([inLayer(hydro, dry), inLayer(drought, dry)]).toEqual([false, true]);
+		expect([inLayer(hydro, flood), inLayer(drought, flood)]).toEqual([true, false]);
+		expect(drought.defaultVisible).toBe(false);
 	});
 });

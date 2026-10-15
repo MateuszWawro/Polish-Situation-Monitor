@@ -1,3 +1,5 @@
+import type { FeatureCollection } from 'geojson';
+
 // Shared types and presentation helpers for events from our API (never from sources directly).
 
 export type EventType =
@@ -28,7 +30,16 @@ export interface SourceStatus {
 }
 
 export interface LayerDef {
+	/** Map layer id; usually the event type, unless one type is split (drought). */
+	id: string;
 	type: EventType;
+	/** Which events of `type` belong here (default: all). */
+	match?: (e: { title: string }) => boolean;
+	/** Draw the area as a dashed outline only (no fill). */
+	outline?: boolean;
+	/** Short explanation shown under the layer name. */
+	note?: string;
+	defaultVisible?: boolean;
 	/** Anchor of the source's section on /zrodla (license and attribution). */
 	sourceAnchor: string;
 	sourceUrl: string;
@@ -38,8 +49,12 @@ export interface LayerDef {
 	kind: 'area' | 'point' | 'icon';
 }
 
+/** IMGW's event name for drought warnings (`zdarzenie`, docs/SOURCES.md §2a). */
+export const DROUGHT_TITLE = 'Susza hydrologiczna';
+
 export const LAYERS: LayerDef[] = [
 	{
+		id: 'weather_warning',
 		type: 'weather_warning',
 		sourceAnchor: 'imgw',
 		sourceUrl: 'https://meteo.imgw.pl/',
@@ -49,15 +64,34 @@ export const LAYERS: LayerDef[] = [
 		kind: 'area'
 	},
 	{
+		id: 'hydro_warning',
 		type: 'hydro_warning',
+		match: (e) => e.title !== DROUGHT_TITLE,
 		sourceAnchor: 'imgw',
 		sourceUrl: 'https://hydro.imgw.pl/',
 		label: 'Ostrzeżenia hydro',
+		note: 'powodziowe i stany wód',
 		source: 'imgw_hydro',
 		sourceName: 'IMGW-PIB',
 		kind: 'area'
 	},
 	{
+		// Long-running, voivodeship-wide: would tint half the country if filled and on by default.
+		id: 'drought',
+		type: 'hydro_warning',
+		match: (e) => e.title === DROUGHT_TITLE,
+		outline: true,
+		defaultVisible: false,
+		sourceAnchor: 'imgw',
+		sourceUrl: 'https://hydro.imgw.pl/',
+		label: 'Susza hydrologiczna',
+		note: 'obrys obszaru, domyślnie ukryta',
+		source: 'imgw_hydro',
+		sourceName: 'IMGW-PIB',
+		kind: 'area'
+	},
+	{
+		id: 'air_quality',
 		type: 'air_quality',
 		sourceAnchor: 'gios',
 		sourceUrl: 'https://powietrze.gios.gov.pl/',
@@ -67,6 +101,7 @@ export const LAYERS: LayerDef[] = [
 		kind: 'point'
 	},
 	{
+		id: 'fire_hotspot',
 		type: 'fire_hotspot',
 		sourceAnchor: 'firms',
 		sourceUrl: 'https://firms.modaps.eosdis.nasa.gov/',
@@ -76,6 +111,7 @@ export const LAYERS: LayerDef[] = [
 		kind: 'point'
 	},
 	{
+		id: 'road_incident',
 		type: 'road_incident',
 		sourceAnchor: 'gddkia',
 		sourceUrl: 'https://www.gov.pl/web/gddkia',
@@ -85,6 +121,9 @@ export const LAYERS: LayerDef[] = [
 		kind: 'icon'
 	}
 ];
+
+/** Drought outline: brown, deliberately outside the severity palette (it is not a level). */
+export const DROUGHT_COLOR = '#8a5a2b';
 
 export const SEVERITY_COLORS = ['#2e9d4e', '#e8b420', '#ef7d1a', '#d1242f'];
 export const SEVERITY_LABELS = [
@@ -161,11 +200,24 @@ export interface EventGroup {
 	rows: EventRow[];
 }
 
+export function inLayer(layer: LayerDef, e: { type: EventType; title: string }): boolean {
+	return e.type === layer.type && (!layer.match || layer.match(e));
+}
+
+/** The part of a type's FeatureCollection that belongs to one layer. */
+export function layerFeatures(layer: LayerDef, fc: FeatureCollection | undefined) {
+	if (!fc || !layer.match) return fc;
+	return {
+		...fc,
+		features: fc.features.filter((f) => inLayer(layer, f.properties as EventProps))
+	};
+}
+
 /** Group clicked events by layer, merging identical rows. Most severe group/row first. */
 export function groupEvents(events: EventProps[]): EventGroup[] {
 	return LAYERS.map((layer) => {
 		const rows: EventRow[] = [];
-		for (const ev of events.filter((e) => e.type === layer.type)) {
+		for (const ev of events.filter((e) => inLayer(layer, e))) {
 			const key = `${ev.severity}|${ev.title}`;
 			const row = rows.find((r) => r.key === key);
 			if (row) row.events.push(ev);

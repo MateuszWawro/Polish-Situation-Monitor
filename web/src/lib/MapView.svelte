@@ -6,16 +6,20 @@
 	// Emitted as a build asset: maplibre would otherwise look for the worker next to its chunk.
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 	import {
+		DROUGHT_COLOR,
 		LAYERS,
 		ROAD_ICONS,
+		layerFeatures,
 		SEVERITY_COLORS,
 		type EventProps,
-		type EventType
+		type EventType,
+		type LayerDef
 	} from '#lib/events.ts';
 
 	interface Props {
 		data: Partial<Record<EventType, FeatureCollection>>;
-		visible: Record<EventType, boolean>;
+		/** Keyed by layer id. */
+		visible: Record<string, boolean>;
 		/** Hide events below this severity (0 = show all). */
 		minSeverity: number;
 		onselect: (events: EventProps[]) => void;
@@ -42,10 +46,10 @@
 		SEVERITY_COLORS[3]
 	] as unknown as string;
 
-	const layerIds = (type: EventType) => {
-		const kind = LAYERS.find((l) => l.type === type)?.kind;
-		if (kind === 'area') return [`${type}-fill`, `${type}-line`];
-		return [kind === 'icon' ? `${type}-icon` : `${type}-circle`];
+	const layerIds = (layer: LayerDef) => {
+		if (layer.kind === 'area')
+			return layer.outline ? [`${layer.id}-line`] : [`${layer.id}-fill`, `${layer.id}-line`];
+		return [layer.kind === 'icon' ? `${layer.id}-icon` : `${layer.id}-circle`];
 	};
 	// Draw order: areas, then points, then road icons on top.
 	const DRAW_ORDER = { area: 0, point: 1, icon: 2 };
@@ -120,29 +124,32 @@
 				m.on('load', async () => {
 					await loadIcons(m);
 					for (const layer of [...LAYERS].sort((a, b) => DRAW_ORDER[a.kind] - DRAW_ORDER[b.kind])) {
-						m.addSource(layer.type, {
+						m.addSource(layer.id, {
 							type: 'geojson',
 							data: { type: 'FeatureCollection', features: [] }
 						});
 						if (layer.kind === 'area') {
+							if (!layer.outline)
+								m.addLayer({
+									id: `${layer.id}-fill`,
+									type: 'fill',
+									source: layer.id,
+									// Low opacity: overlapping warnings stack up.
+									paint: { 'fill-color': severityColor, 'fill-opacity': 0.12 }
+								});
 							m.addLayer({
-								id: `${layer.type}-fill`,
-								type: 'fill',
-								source: layer.type,
-								// Low opacity: overlapping warnings (e.g. dozens of drought areas) stack up.
-								paint: { 'fill-color': severityColor, 'fill-opacity': 0.08 }
-							});
-							m.addLayer({
-								id: `${layer.type}-line`,
+								id: `${layer.id}-line`,
 								type: 'line',
-								source: layer.type,
-								paint: { 'line-color': severityColor, 'line-width': 1.5 }
+								source: layer.id,
+								paint: layer.outline
+									? { 'line-color': DROUGHT_COLOR, 'line-width': 2, 'line-dasharray': [3, 2] }
+									: { 'line-color': severityColor, 'line-width': 1.5 }
 							});
 						} else if (layer.kind === 'icon') {
 							m.addLayer({
-								id: `${layer.type}-icon`,
+								id: `${layer.id}-icon`,
 								type: 'symbol',
-								source: layer.type,
+								source: layer.id,
 								layout: {
 									'icon-image': ['concat', 'road-', ['to-string', ['get', 'severity']]],
 									'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 9, 1],
@@ -153,9 +160,9 @@
 							});
 						} else {
 							m.addLayer({
-								id: `${layer.type}-circle`,
+								id: `${layer.id}-circle`,
 								type: 'circle',
-								source: layer.type,
+								source: layer.id,
 								paint: {
 									'circle-color': severityColor,
 									// Small at country zoom (hundreds of stations), larger when zoomed in.
@@ -165,13 +172,13 @@
 								}
 							});
 						}
-						for (const id of layerIds(layer.type)) {
+						for (const id of layerIds(layer)) {
 							m.on('mouseenter', id, () => (m.getCanvas().style.cursor = 'pointer'));
 							m.on('mouseleave', id, () => (m.getCanvas().style.cursor = ''));
 						}
 					}
 					m.on('click', (e: MapMouseEvent) => {
-						const ids = LAYERS.filter((l) => visible[l.type]).flatMap((l) => layerIds(l.type));
+						const ids = LAYERS.filter((l) => visible[l.id]).flatMap(layerIds);
 						const hits = m.queryRenderedFeatures(e.point, { layers: ids });
 						// One feature per event: a polygon can be hit by both its fill and line layer.
 						const events = hits
@@ -200,10 +207,10 @@
 	$effect(() => {
 		if (!map || !loaded) return;
 		for (const layer of LAYERS) {
-			const fc = data[layer.type];
-			if (fc) (map.getSource(layer.type) as GeoJSONSource).setData(fc);
-			for (const id of layerIds(layer.type)) {
-				map.setLayoutProperty(id, 'visibility', visible[layer.type] ? 'visible' : 'none');
+			const fc = layerFeatures(layer, data[layer.type]);
+			if (fc) (map.getSource(layer.id) as GeoJSONSource).setData(fc);
+			for (const id of layerIds(layer)) {
+				map.setLayoutProperty(id, 'visibility', visible[layer.id] ? 'visible' : 'none');
 				// Filtered features are not rendered, so clicks don't hit them either.
 				map.setFilter(id, ['>=', ['get', 'severity'], minSeverity]);
 			}

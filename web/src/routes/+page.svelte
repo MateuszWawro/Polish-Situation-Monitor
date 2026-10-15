@@ -7,6 +7,7 @@
 	import StaleBanner from '#lib/StaleBanner.svelte';
 	import {
 		LAYERS,
+		layerFeatures,
 		ROAD_ICONS,
 		SEVERITY_COLORS,
 		SEVERITY_LABELS,
@@ -21,7 +22,10 @@
 
 	let data: Partial<Record<EventType, FeatureCollection>> = $state({});
 	let visible = $state(
-		Object.fromEntries(LAYERS.map((l) => [l.type, true])) as Record<EventType, boolean>
+		Object.fromEntries(LAYERS.map((l) => [l.id, l.defaultVisible ?? true])) as Record<
+			string,
+			boolean
+		>
 	);
 	let minSeverity = $state(0);
 	let status: SourceStatus[] = $state([]);
@@ -47,10 +51,10 @@
 
 	async function loadEvents() {
 		const results = await Promise.allSettled(
-			LAYERS.map(async (l) => {
-				const r = await fetch(`/api/events?type=${l.type}`);
+			[...new Set(LAYERS.map((l) => l.type))].map(async (type) => {
+				const r = await fetch(`/api/events?type=${type}`);
 				if (!r.ok) throw new Error(`${r.status}`);
-				data[l.type] = await r.json();
+				data[type] = await r.json();
 			})
 		);
 		loadError = results.some((r) => r.status === 'rejected');
@@ -124,13 +128,14 @@
 		</fieldset>
 		<fieldset>
 			<legend class="sr-only">Widoczne warstwy</legend>
-			{#each LAYERS as layer (layer.type)}
+			{#each LAYERS as layer (layer.id)}
 				{@const st = statusOf(layer.source)}
 				<label class="layer">
-					<input type="checkbox" bind:checked={visible[layer.type]} />
+					<input type="checkbox" bind:checked={visible[layer.id]} />
 					<span>
 						<strong>{layer.label}</strong>
-						<span class="count">({countFrom(data[layer.type]) ?? '…'})</span>
+						<span class="count">({countFrom(layerFeatures(layer, data[layer.type])) ?? '…'})</span>
+						{#if layer.note}<small>{layer.note}</small>{/if}
 						<small class:stale={st?.stale}>
 							{layer.sourceName} · aktualizacja: {timeAgo(st?.last_success_at ?? null, now)}
 						</small>

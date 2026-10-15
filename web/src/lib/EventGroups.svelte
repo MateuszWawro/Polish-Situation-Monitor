@@ -24,7 +24,7 @@
 		LAYERS.find((l) => l.source === source)?.sourceName ?? source;
 </script>
 
-{#each groups as group (group.layer.type)}
+{#each groups as group (group.layer.id)}
 	<section class="group" aria-label={group.layer.label}>
 		<h3>{group.layer.label} <span class="count">({group.count})</span></h3>
 		{#each group.rows as row (row.key)}
