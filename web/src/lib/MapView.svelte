@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import type { Map as MlMap, GeoJSONSource, MapMouseEvent } from 'maplibre-gl';
-	import type { FeatureCollection } from 'geojson';
+	import type { FeatureCollection, Geometry } from 'geojson';
+	import { bbox, type MapViewState } from '#lib/geo.ts';
 	// Emitted as a build asset: maplibre would otherwise look for the worker next to its chunk.
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 	import {
@@ -23,8 +24,14 @@
 		/** Hide events below this severity (0 = show all). */
 		minSeverity: number;
 		onselect: (events: EventProps[]) => void;
+		/** Start view (e.g. from a shared link); default: whole Poland. */
+		initialView?: MapViewState | null;
+		/** Called when the view settles, to keep the URL shareable. */
+		onmove?: (view: MapViewState) => void;
+		/** Geometry to zoom to (a shared event). */
+		focus?: Geometry | null;
 	}
-	let { data, visible, minSeverity, onselect }: Props = $props();
+	let { data, visible, minSeverity, onselect, initialView, onmove, focus }: Props = $props();
 
 	let container: HTMLDivElement;
 	let map: MlMap | undefined = $state();
@@ -86,8 +93,9 @@
 				setWorkerUrl(workerUrl);
 				const m = new MapCtor({
 					container,
-					bounds: POLAND,
-					fitBoundsOptions: { padding: 16 },
+					...(initialView
+						? { center: initialView.center, zoom: initialView.zoom }
+						: { bounds: POLAND, fitBoundsOptions: { padding: 16 } }),
 					attributionControl: false,
 					style: {
 						version: 8,
@@ -191,6 +199,11 @@
 							)
 						);
 					});
+					// Any settled view (gesture or zoom-to-event) is what a shared link should show.
+					m.on('moveend', () => {
+						const c = m.getCenter();
+						onmove?.({ center: [c.lng, c.lat], zoom: m.getZoom() });
+					});
 					loaded = true;
 				});
 				map = m;
@@ -215,6 +228,12 @@
 				map.setFilter(id, ['>=', ['get', 'severity'], minSeverity]);
 			}
 		}
+	});
+
+	$effect(() => {
+		if (!map || !loaded || !focus) return;
+		const box = bbox(focus);
+		if (box) map.fitBounds(box, { padding: 60, maxZoom: 11, duration: 600 });
 	});
 </script>
 

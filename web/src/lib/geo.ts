@@ -1,5 +1,5 @@
 // On-device geometry: the user's position is only ever compared locally (privacy rule).
-import type { FeatureCollection, MultiPolygon, Polygon, Position } from 'geojson';
+import type { FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 
 function inRing([x, y]: Position, ring: Position[]): boolean {
 	let inside = false;
@@ -30,4 +30,34 @@ export function findPowiat(point: Position, powiaty: FeatureCollection): string 
 			return String(f.properties?.teryt ?? f.id);
 	}
 	return null;
+}
+
+export interface MapViewState {
+	center: [number, number];
+	zoom: number;
+}
+
+/** [[west, south], [east, north]] of any GeoJSON geometry, or null when empty. */
+export function bbox(geometry: Geometry): [[number, number], [number, number]] | null {
+	let w = Infinity,
+		s = Infinity,
+		e = -Infinity,
+		n = -Infinity;
+	const walk = (c: unknown): void => {
+		if (Array.isArray(c) && typeof c[0] === 'number') {
+			const [x, y] = c as number[];
+			w = Math.min(w, x);
+			e = Math.max(e, x);
+			s = Math.min(s, y);
+			n = Math.max(n, y);
+		} else if (Array.isArray(c)) c.forEach(walk);
+	};
+	if (geometry.type === 'GeometryCollection') geometry.geometries.forEach((g) => walk(bbox(g)));
+	else walk(geometry.coordinates);
+	return w === Infinity
+		? null
+		: [
+				[w, s],
+				[e, n]
+			];
 }

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { shareLink } from '#lib/share.ts';
 	import {
 		LAYERS,
 		SEVERITY_COLORS,
@@ -20,6 +22,15 @@
 	let { events, now, openAll = false }: Props = $props();
 
 	const groups = $derived(groupEvents(events));
+
+	let shared: string | null = $state(null);
+	async function share(ev: EventProps) {
+		const url = `${location.origin}${resolve('/e/[id]', { id: ev.id })}`;
+		if ((await shareLink(url, ev.title)) === 'copied') {
+			shared = ev.id;
+			setTimeout(() => (shared = null), 2500);
+		}
+	}
 	const sourceLabel = (source: string) =>
 		LAYERS.find((l) => l.source === source)?.sourceName ?? source;
 </script>
@@ -54,6 +65,11 @@
 										>strona źródła</a
 									>{/if}
 								· aktualizacja {timeAgo(ev.updated_at, now)}
+							</p>
+							<p class="actions">
+								<a href={resolve('/e/[id]', { id: ev.id })}>Szczegóły</a>
+								<button type="button" onclick={() => share(ev)}>🔗 Udostępnij</button>
+								<span role="status">{shared === ev.id ? 'Skopiowano link' : ''}</span>
 							</p>
 						</div>
 					{/each}
@@ -144,5 +160,25 @@
 		white-space: pre-line;
 		margin: 0.25rem 0;
 		font-size: 0.95rem;
+	}
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin: 0.25rem 0 0;
+		font-size: 0.85rem;
+	}
+	.actions a,
+	.actions button {
+		color: var(--accent);
+		background: none;
+		border: 0;
+		padding: 0.4rem 0;
+		min-height: 36px;
+		font: inherit;
+		cursor: pointer;
+	}
+	.actions [role='status'] {
+		color: var(--muted);
 	}
 </style>

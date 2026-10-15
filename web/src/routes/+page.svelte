@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { FeatureCollection } from 'geojson';
+	import type { FeatureCollection, Geometry } from 'geojson';
+	import { replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import type { MapViewState } from '#lib/geo.ts';
+	import { buildMapUrl, parseMapUrl } from '#lib/mapUrl.ts';
+	import { shareLink } from '#lib/share.ts';
 	import MapView from '#lib/MapView.svelte';
 	import EventGroups from '#lib/EventGroups.svelte';
 	import StaleBanner from '#lib/StaleBanner.svelte';
@@ -30,6 +34,39 @@
 	let minSeverity = $state(0);
 	let status: SourceStatus[] = $state([]);
 	let selected: EventProps[] = $state([]);
+
+	// Shared link state (?l=…&min=…&c=…&z=…&e=…). Read synchronously so the map starts there.
+	const fromUrl =
+		typeof window !== 'undefined'
+			? parseMapUrl(
+					new URLSearchParams(location.search),
+					LAYERS.map((l) => l.id)
+				)
+			: {};
+	let view: MapViewState | undefined = $state(fromUrl.view);
+	let focus: Geometry | null = $state(null);
+	/** Event opened from a shared link; kept in the URL while its details are open. */
+	let linkedEvent: string | undefined = $state(fromUrl.event);
+	let shareNote = $state('');
+
+	async function shareView() {
+		const result = await shareLink(location.href, 'Monitor sytuacyjny Polski – mapa');
+		shareNote =
+			result === 'copied' ? 'Skopiowano link' : result === 'failed' ? 'Nie udało się' : '';
+		setTimeout(() => (shareNote = ''), 2500);
+	}
+
+	async function openLinkedEvent(id: string) {
+		try {
+			const r = await fetch(`/api/events/${id}`);
+			if (!r.ok) return;
+			const feature = await r.json();
+			selected = [feature.properties as EventProps];
+			if (!fromUrl.view) focus = feature.geometry;
+		} catch {
+			// a broken link just shows the map
+		}
+	}
 	const MIN_SEVERITY_KEY = 'psm.minSeverity';
 	const countFrom = (fc: FeatureCollection | undefined) =>
 		fc?.features.filter((f) => (f.properties?.severity ?? 0) >= minSeverity).length;
@@ -48,6 +85,19 @@
 	let now = $state(Date.now());
 
 	const statusOf = (source: string) => status.find((s) => s.source === source);
+
+	let urlReady = false;
+	$effect(() => {
+		const defaults = LAYERS.every((l) => visible[l.id] === (l.defaultVisible ?? true));
+		const url = buildMapUrl({
+			layers: defaults ? undefined : LAYERS.filter((l) => visible[l.id]).map((l) => l.id),
+			minSeverity,
+			view,
+			event: selected.length ? linkedEvent : undefined
+		});
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved path + query
+		if (urlReady) replaceState(`${resolve('/')}${url}`, {});
+	});
 
 	async function loadEvents() {
 		const results = await Promise.allSettled(
@@ -77,6 +127,11 @@
 		} catch {
 			// storage blocked: default filter
 		}
+		// A shared link wins over local preferences.
+		if (fromUrl.layers) for (const l of LAYERS) visible[l.id] = fromUrl.layers.includes(l.id);
+		if (fromUrl.minSeverity !== undefined) minSeverity = fromUrl.minSeverity;
+		if (fromUrl.event) openLinkedEvent(fromUrl.event);
+		urlReady = true;
 		loadEvents();
 		loadStatus();
 		const timers = [
@@ -90,7 +145,18 @@
 
 <svelte:head><title>Monitor sytuacyjny Polski – mapa</title></svelte:head>
 
-<MapView {data} {visible} {minSeverity} onselect={(events) => (selected = events)} />
+<MapView
+	{data}
+	{visible}
+	{minSeverity}
+	{focus}
+	initialView={fromUrl.view}
+	onmove={(v) => (view = v)}
+	onselect={(events) => {
+		selected = events;
+		linkedEvent = undefined;
+	}}
+/>
 
 <div class="banners" aria-live="polite">
 	{#if loadError}
@@ -157,6 +223,10 @@
 			{/each}
 		</ul>
 		<p class="hint">Kliknij obszar lub punkt, aby zobaczyć szczegóły.</p>
+		<p class="share-view">
+			<button type="button" class="link" onclick={shareView}>🔗 Udostępnij ten widok</button>
+			<span role="status">{shareNote}</span>
+		</p>
 	</div>
 </aside>
 
@@ -311,6 +381,23 @@
 		width: 1.1rem;
 		height: 1.1rem;
 		flex: none;
+	}
+	.share-view {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0.25rem 0 0;
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.link {
+		background: none;
+		border: 0;
+		padding: 0.4rem 0;
+		min-height: 36px;
+		color: var(--accent);
+		font: inherit;
+		cursor: pointer;
 	}
 	.hint {
 		font-size: 0.85rem;

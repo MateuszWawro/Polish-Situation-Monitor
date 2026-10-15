@@ -17,6 +17,9 @@ export interface EventProps {
 	valid_to: string | null;
 	source_url: string | null;
 	updated_at: string;
+	/** Present in API responses; MapLibre turns arrays in feature properties into JSON strings. */
+	teryt_powiat?: string[];
+	source_event_id?: string;
 }
 
 export interface SourceStatus {
