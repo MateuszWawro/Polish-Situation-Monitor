@@ -93,7 +93,7 @@ SOURCES_HISTORY_SQL = text("""
         'source', s.source,
         'days', (
             SELECT json_agg(json_build_object(
-                'date', d.day, 'attempts', coalesce(a.n, 0), 'ok', coalesce(a.ok, 0)
+                'date', d.day::date, 'attempts', coalesce(a.n, 0), 'ok', coalesce(a.ok, 0)
             ) ORDER BY d.day)
             FROM generate_series(
                 (now() AT TIME ZONE 'Europe/Warsaw')::date - 6,

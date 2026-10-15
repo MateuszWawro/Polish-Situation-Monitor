@@ -21,11 +21,17 @@ pytestmark = pytest.mark.skipif("DATABASE_URL" not in os.environ, reason="needs 
 def conn() -> Iterator[psycopg.Connection]:
     dsn = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
     with psycopg.connect(dsn, autocommit=True) as c:
+        # Shared dev DB: keep the real source status and run log intact.
+        saved_status = c.execute("SELECT * FROM source_status").fetchall()
+        last_attempt = c.execute("SELECT coalesce(max(id), 0) FROM fetch_attempts").fetchone()
         c.execute("DELETE FROM events WHERE source = 'imgw_meteo'")
         c.execute("DELETE FROM source_status WHERE source = 'imgw_meteo'")
         yield c
         c.execute("DELETE FROM events WHERE source = 'imgw_meteo'")
-        c.execute("DELETE FROM source_status WHERE source = 'imgw_meteo'")
+        c.execute("DELETE FROM fetch_attempts WHERE id > %s", last_attempt)
+        c.execute("DELETE FROM source_status")
+        with c.cursor() as cur:
+            cur.executemany("INSERT INTO source_status VALUES (%s, %s, %s, %s, %s)", saved_status)
 
 
 def run(conn: psycopg.Connection, payload: Any, status: int = 200) -> int:
