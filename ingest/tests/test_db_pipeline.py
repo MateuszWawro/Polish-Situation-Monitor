@@ -9,7 +9,10 @@ import psycopg
 import pytest
 import respx
 
+from ingest.firms import FirmsWorker
+from ingest.imgw_hydro import ImgwHydroWarningsWorker
 from ingest.imgw_meteo import ImgwMeteoWorker
+from tests.conftest import load
 
 pytestmark = pytest.mark.skipif("DATABASE_URL" not in os.environ, reason="needs PostGIS")
 
@@ -80,3 +83,44 @@ def test_failure_recorded_and_data_kept(
         " WHERE source = 'imgw_meteo'"
     ).fetchone()
     assert status is not None and status[0] and "500" in status[1]
+
+
+def test_voivodeship_codes_expand_and_outside_poland_skipped(conn: psycopg.Connection) -> None:
+    conn.execute("DELETE FROM events WHERE source IN ('imgw_hydro', 'firms')")
+    try:
+        hydro = ImgwHydroWarningsWorker(sleep=lambda _: None)
+        warning = {**load("imgw_hydro_warnings.json")[0], "obszary": [{"wojewodztwo": "opolskie"}]}
+        firms = FirmsWorker(sleep=lambda _: None)
+        rows = [  # Opole (PL) and Ostrava (CZ)
+            {
+                "latitude": "50.67",
+                "longitude": "17.92",
+                "acq_date": "2026-10-14",
+                "acq_time": "0100",
+                "satellite": "N20",
+                "confidence": "high",
+            },
+            {
+                "latitude": "49.83",
+                "longitude": "18.29",
+                "acq_date": "2026-10-14",
+                "acq_time": "0100",
+                "satellite": "N20",
+                "confidence": "high",
+            },
+        ]
+        with respx.mock, httpx.Client() as client:
+            respx.get(hydro.url).mock(return_value=httpx.Response(200, json=[warning]))
+            hydro.run(conn, client)
+        firms.fetch = lambda client: rows  # type: ignore[method-assign]
+        with httpx.Client() as client:
+            firms.run(conn, client)
+        found = conn.execute(
+            "SELECT source, teryt_powiat FROM events WHERE source IN ('imgw_hydro', 'firms')"
+        ).fetchall()
+        by_source = {source: teryt for source, teryt in found}
+        assert len(found) == 2
+        assert by_source["imgw_hydro"] and all(t.startswith("16") for t in by_source["imgw_hydro"])
+        assert by_source["firms"] == ["1661"]  # city of Opole
+    finally:
+        conn.execute("DELETE FROM events WHERE source IN ('imgw_hydro', 'firms')")

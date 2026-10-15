@@ -34,13 +34,14 @@ class Event:
     raw: dict[str, Any]
     description: str | None = None
     source_url: str | None = None
-    # Either TERYT powiat codes from the source, or a point/shape (WKT, SRID 4326)
-    # from which the codes are derived with ST_Intersects.
+    # Either TERYT codes from the source (4-digit powiat or 2-digit voivodeship), or a
+    # point/shape (WKT, SRID 4326) from which powiat codes are derived with ST_Intersects.
     teryt_powiat: list[str] = field(default_factory=list)
     geom_wkt: str | None = None
 
 
-# geom: given WKT, else union of the listed powiaty. teryt: given codes, else intersecting powiaty.
+# geom: given WKT, else union of the listed powiaty. teryt: listed powiat codes (2-digit
+# voivodeship codes expand to all their powiaty), else powiaty intersecting the geometry.
 # The WHERE clause keeps updated_at/fetched_at untouched when nothing meaningful changed.
 UPSERT_SQL = """
 WITH input AS (
@@ -50,12 +51,15 @@ WITH input AS (
         coalesce(
             ST_GeomFromText(wkt, 4326),
             (SELECT ST_Union(a.geom) FROM admin_units a
-             WHERE a.level = 'powiat' AND a.teryt = ANY(input.teryt))
+             WHERE a.level = 'powiat'
+               AND (a.teryt = ANY(input.teryt) OR left(a.teryt, 2) = ANY(input.teryt)))
         ) AS geom,
-        CASE WHEN cardinality(teryt) > 0 THEN teryt ELSE coalesce(
-            (SELECT array_agg(a.teryt ORDER BY a.teryt) FROM admin_units a
-             WHERE a.level = 'powiat' AND ST_Intersects(a.geom, ST_GeomFromText(wkt, 4326))),
-            '{}') END AS teryt
+        coalesce((SELECT array_agg(a.teryt ORDER BY a.teryt) FROM admin_units a
+            WHERE a.level = 'powiat' AND CASE
+                WHEN cardinality(input.teryt) > 0
+                THEN a.teryt = ANY(input.teryt) OR left(a.teryt, 2) = ANY(input.teryt)
+                ELSE ST_Intersects(a.geom, ST_GeomFromText(input.wkt, 4326)) END
+        ), '{}') AS teryt
     FROM input
 )
 INSERT INTO events (source, source_event_id, type, severity, title, description, geom,
@@ -64,6 +68,7 @@ SELECT %(source)s, %(source_event_id)s, %(type)s, %(severity)s, %(title)s, %(des
        resolved.geom, resolved.teryt, %(valid_from)s, %(valid_to)s, %(source_url)s, now(),
        %(raw)s::jsonb
 FROM resolved
+WHERE cardinality(resolved.teryt) > 0  -- outside Poland (or unknown codes): not our event
 ON CONFLICT (source, source_event_id) DO UPDATE SET
     type = EXCLUDED.type, severity = EXCLUDED.severity, title = EXCLUDED.title,
     description = EXCLUDED.description, geom = EXCLUDED.geom,
@@ -113,14 +118,14 @@ class Worker[T: BaseModel](ABC):
     def __init__(self, sleep: Callable[[float], None] = time.sleep) -> None:
         self.sleep = sleep
 
-    def fetch(self, client: httpx.Client) -> Any:
-        """GET JSON with exponential backoff on network errors, 429 and 5xx."""
+    def get(self, client: httpx.Client, url: str) -> httpx.Response:
+        """GET with exponential backoff on network errors, 429 and 5xx."""
         for attempt in range(1, self.max_attempts + 1):
             try:
-                response = client.get(self.url, headers={"User-Agent": USER_AGENT}, timeout=30)
+                response = client.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
                 if response.status_code not in RETRY_STATUSES:
                     response.raise_for_status()
-                    return response.json()
+                    return response
                 error: Exception = httpx.HTTPStatusError(
                     f"HTTP {response.status_code}", request=response.request, response=response
                 )
@@ -139,6 +144,9 @@ class Worker[T: BaseModel](ABC):
             self.sleep(delay)
         raise AssertionError("unreachable")
 
+    def fetch(self, client: httpx.Client) -> Any:
+        return self.get(client, self.url).json()
+
     def validate(self, payload: Any) -> list[T]:
         """Validate each item separately: one malformed record must not drop the whole feed."""
         if not isinstance(payload, list):
@@ -154,7 +162,8 @@ class Worker[T: BaseModel](ABC):
         return items
 
     @abstractmethod
-    def normalize(self, item: T) -> Event: ...
+    def normalize(self, item: T) -> Event | None:
+        """Map one item to an event, or None when it is not an event (e.g. below threshold)."""
 
     def upsert(self, conn: psycopg.Connection, events: list[Event]) -> None:
         with conn.cursor() as cur:
@@ -183,7 +192,7 @@ class Worker[T: BaseModel](ABC):
         """One full cycle. Never raises: errors are logged and recorded in source_status."""
         params = {"source": self.source, "interval": self.interval_s}
         try:
-            events = [self.normalize(i) for i in self.validate(self.fetch(client))]
+            events = [e for i in self.validate(self.fetch(client)) if (e := self.normalize(i))]
             with conn.transaction():
                 self.upsert(conn, events)
                 conn.execute(STATUS_SUCCESS_SQL, params)
