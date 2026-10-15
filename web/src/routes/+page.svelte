@@ -6,6 +6,9 @@
 	import type { MapViewState } from '#lib/geo.ts';
 	import { buildMapUrl, parseMapUrl } from '#lib/mapUrl.ts';
 	import { shareLink } from '#lib/share.ts';
+	import MapSearch from '#lib/MapSearch.svelte';
+	import { bboxPolygon, powiatBboxes } from '#lib/bboxes.ts';
+	import type { PlaceHit } from '#lib/search.ts';
 	import MapView from '#lib/MapView.svelte';
 	import EventGroups from '#lib/EventGroups.svelte';
 	import StaleBanner from '#lib/StaleBanner.svelte';
@@ -54,6 +57,16 @@
 		shareNote =
 			result === 'copied' ? 'Skopiowano link' : result === 'failed' ? 'Nie udało się' : '';
 		setTimeout(() => (shareNote = ''), 2500);
+	}
+
+	async function zoomToPlace(hit: PlaceHit) {
+		try {
+			const box = (await powiatBboxes())[hit.teryt];
+			// Gminy have no geometry in the index: zoom to their powiat.
+			if (box) focus = bboxPolygon(box);
+		} catch {
+			// map stays where it is
+		}
 	}
 
 	async function openLinkedEvent(id: string) {
@@ -165,7 +178,8 @@
 	<StaleBanner {status} {now} />
 </div>
 
-<aside class="panel" aria-label="Warstwy i legenda">
+<aside class="panel" aria-label="Wyszukiwanie, warstwy i legenda">
+	<MapSearch onpick={zoomToPlace} />
 	<button
 		class="panel-toggle"
 		aria-expanded={panelOpen}
