@@ -27,3 +27,14 @@ def test_parse_rejects_feature_without_teryt() -> None:
     broken = GML.replace(b"<ms:JPT_KOD_JE>1416</ms:JPT_KOD_JE>", b"")
     with pytest.raises(ValueError):
         list(parse_features(io.BytesIO(broken), "A02_Granice_powiatow"))
+
+
+def test_parse_names() -> None:
+    from build_places_index import parse_names
+
+    gml = b"""<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0"
+        xmlns:ms="http://mapserver.gis.umn.edu/mapserver">
+      <wfs:member><ms:A03_Granice_gmin><ms:JPT_KOD_JE>1861011</ms:JPT_KOD_JE>
+        <ms:JPT_NAZWA_>Krosno</ms:JPT_NAZWA_></ms:A03_Granice_gmin></wfs:member>
+    </wfs:FeatureCollection>"""
+    assert parse_names(gml, "A03_Granice_gmin") == [("1861011", "Krosno")]
