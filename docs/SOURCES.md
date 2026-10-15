@@ -164,6 +164,16 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
   - `private` – everything else: light aircraft, helicopters (incl. rescue and police), gliders, unknown.
 - Snapshot 2026-10-15 19:49 local: 96 aircraft over Poland – 74 commercial, 14 private, 8 military.
 
+## 11. CelesTrak – satellite orbital data (map layer, 2026-10-15)
+
+- **Source:** CelesTrak `gp.php` (keyless, verified live). TLE/GP data of the US Space Force public catalogue. Fetched groups: `stations`, `visual`, `gnss`, `starlink`.
+- **Usage policy** (https://celestrak.org/usage-policy.php): freely available; **GP updates every ~2 h, callers must not fetch more often**, cache, and stop on non-200. We fetch every 6 h (TLE stays accurate for days).
+- **Stored:** latest TLE per satellite in `satellites` (table replaced each run); a satellite in several groups keeps the first (priority stations > visual > gnss > starlink). API `/api/satellites?groups=…` serves the requested groups.
+- **Positions are computed in the browser** with SGP4 (satellite.js, ADR 0003), every second. Server snapshots would be stale: LEO satellites move ~7.5 km/s and cross Poland in 1–2 min.
+- **"Over Poland"** = sub-satellite point within the locked map view. Measured 2026-10-15: `visual`+`stations` gives ~0 over Poland at any instant (tiny window, ~150 fast LEO objects), so **Starlink is on by default** (~30 over Poland at any time, ~10.6k TLEs, 52 ms to propagate once). GNSS is an optional toggle.
+- **Counts 2026-10-15:** stations 17, visual 152, gnss 168, starlink ~10 650.
+- Shows the ground-track point, not a view from orbit. Satellites without a transponder-independent public catalogue entry are not shown; the catalogue is the US Space Force's public one.
+
 ## Decisions (accepted 2026-10-15)
 
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
@@ -174,3 +184,4 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 6. **GDDKiA** (accepted 2026-10-15): open XML feed, mapping as proposed in §6. **Records without coordinates are skipped** (changed 2026-10-15): the first choice – assigning them to the whole voivodeship – made 28 incidents show up in 724 powiaty, e.g. S19 roadworks near Dukla listed for the city of Krosno in „Moja okolica”. ~5% of records (33 of 550 on 2026-10-15) are lost; they reappear automatically once GDDKiA adds coordinates. Poll every 15 min, full download (no ETag shortcut: an unchanged-file response would otherwise close all incidents as missing). Note: the source's `droga_zamknieta` flag is also set for partial closures (one carriageway / heavy vehicles only).
 7. **GPS interference** (accepted 2026-10-15): adsb.lol (ODbL) as the one non-official source, method as in §9, layer labelled as an estimate on the map and on `/zrodla`.
 8. **Aircraft layer** (accepted 2026-10-15): adsb.lol snapshot, classes and filters as in §10; latest positions only, LADD/PIA aircraft hidden.
+9. **Satellites** (accepted 2026-10-15): CelesTrak TLE, SGP4 in the browser (ADR 0003). Starlink on by default so the layer is not empty; see §11.
