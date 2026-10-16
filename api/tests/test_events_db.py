@@ -13,7 +13,7 @@ from tests.conftest import needs_db
 
 pytestmark = needs_db
 client = TestClient(app)
-SOURCES = {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia", "adsb_lol"}
+SOURCES = {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia", "adsb_lol", "emsc"}
 
 INSERT = text("""
     INSERT INTO events (source, source_event_id, type, severity, title, geom, teryt_powiat,

@@ -11,6 +11,7 @@ EventType = Literal[
     "fire_hotspot",
     "road_incident",
     "gps_interference",
+    "earthquake",
 ]
 EVENT_TYPES: tuple[str, ...] = get_args(EventType)
 
@@ -22,6 +23,7 @@ CACHE_TTL_S = {
     "fire_hotspot": 300,
     "road_incident": 300,
     "gps_interference": 60,
+    "earthquake": 300,
 }
 MAX_FEATURES = 5000
 

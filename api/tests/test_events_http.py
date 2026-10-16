@@ -25,7 +25,7 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
 @pytest.mark.parametrize(
     "params",
     [
-        {"type": "earthquake"},
+        {"type": "volcano"},
         {"bbox": "14,49,24"},
         {"bbox": "24,49,14,54"},
         {"bbox": "a,b,c,d"},
@@ -36,6 +36,13 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
 def test_invalid_params_rejected(params: dict[str, str], calls: list[object]) -> None:
     assert client.get("/api/events", params=params).status_code == 422
     assert calls == []
+
+
+def test_earthquake_type_accepted(calls: list[dict[str, object]]) -> None:
+    response = client.get("/api/events", params={"type": "earthquake"})
+    assert response.status_code == 200
+    assert calls[0]["types"] == ["earthquake"]
+    assert response.headers["cache-control"] == "public, max-age=300"
 
 
 def test_params_passed_to_query(calls: list[dict[str, object]]) -> None:
