@@ -1,7 +1,9 @@
-"""Full pipeline against PostGIS with imported admin_units. Skipped without DATABASE_URL."""
+"""Full pipeline against PostGIS with imported admin_units. Skipped without TEST_DATABASE_URL."""
 
 import os
+import sys
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -15,24 +17,28 @@ from ingest.imgw_hydro import ImgwHydroWarningsWorker
 from ingest.imgw_meteo import ImgwMeteoWorker
 from tests.conftest import load
 
-pytestmark = pytest.mark.skipif("DATABASE_URL" not in os.environ, reason="needs PostGIS")
+pytestmark = pytest.mark.skipif(
+    "TEST_DATABASE_URL" not in os.environ, reason="needs TEST_DATABASE_URL"
+)
+
+
+@pytest.fixture(scope="session")
+def dsn() -> str:
+    """Fresh dedicated test DB; never DATABASE_URL (that one holds real data)."""
+    sys.path.insert(0, str(Path(__file__).parents[2] / "db"))
+    from testdb import prepare  # type: ignore[import-not-found]
+
+    url = os.environ["TEST_DATABASE_URL"]
+    prepare(url)
+    return url.replace("postgresql+psycopg://", "postgresql://")
 
 
 @pytest.fixture
-def conn() -> Iterator[psycopg.Connection]:
-    dsn = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+def conn(dsn: str) -> Iterator[psycopg.Connection]:
     with psycopg.connect(dsn, autocommit=True) as c:
-        # Shared dev DB: keep the real source status and run log intact.
-        saved_status = c.execute("SELECT * FROM source_status").fetchall()
-        last_attempt = c.execute("SELECT coalesce(max(id), 0) FROM fetch_attempts").fetchone()
         c.execute("DELETE FROM events WHERE source = 'imgw_meteo'")
         c.execute("DELETE FROM source_status WHERE source = 'imgw_meteo'")
         yield c
-        c.execute("DELETE FROM events WHERE source = 'imgw_meteo'")
-        c.execute("DELETE FROM fetch_attempts WHERE id > %s", last_attempt)
-        c.execute("DELETE FROM source_status")
-        with c.cursor() as cur:
-            cur.executemany("INSERT INTO source_status VALUES (%s, %s, %s, %s, %s)", saved_status)
 
 
 def run(conn: psycopg.Connection, payload: Any, status: int = 200) -> int:

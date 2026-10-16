@@ -17,6 +17,14 @@ python-lint:
 python-test:
   extends: .python
   stage: test
+  services:
+    - name: postgis/postgis:18-3.6-alpine
+      alias: postgis
+  variables:
+    POSTGRES_USER: psm
+    POSTGRES_PASSWORD: psm
+    POSTGRES_DB: psm_test
+    TEST_DATABASE_URL: postgresql+psycopg://psm:psm@postgis:5432/psm_test
   script: [pytest -q]
 
 .web:

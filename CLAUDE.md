@@ -32,8 +32,11 @@ Talk to the owner in Polish; code, names, comments and commits in English.
 - Migrations: `cd db && DATABASE_URL=... alembic upgrade head` (hand-written SQL, no autogenerate)
 - Boundaries: `cd db && DATABASE_URL=... python import_prg.py` (~1 min, re-runnable)
 - Place search index: `cd db && python build_places_index.py ../web/static/places-index.json` (re-run when PRG changes)
-- DB-backed API tests run only when `DATABASE_URL` is set (skipped in CI for now).
-  Ingest DB tests wipe events of the sources they test – re-run the workers afterwards on a dev DB.
+- DB-backed tests (api, ingest) run only when `TEST_DATABASE_URL` is set and never touch
+  `DATABASE_URL`. The session fixture (`db/testdb.py`) runs Alembic and wipes every table, then
+  loads a few box-shaped admin_units (no PRG import). Create the DB once:
+  `createdb -h localhost -p 5433 -U psm psm_test`, then
+  `TEST_DATABASE_URL=postgresql+psycopg://psm@localhost:5433/psm_test pytest`. CI uses a postgis service.
 
 ## Web routing
 - Static build (adapter-static). Dynamic pages (`/e/{id}`) are not prerendered: the server
