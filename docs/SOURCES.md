@@ -174,6 +174,38 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 - **Counts 2026-10-15:** stations 17, visual 152, gnss 168, starlink ~10 650.
 - Shows the ground-track point, not a view from orbit. Satellites without a transponder-independent public catalogue entry are not shown; the catalogue is the US Space Force's public one.
 
+## 9. EMSC – earthquakes and mining tremors ✅ (step 0, 2026-10-16)
+
+- **Endpoint:** `GET https://www.seismicportal.eu/fdsnws/event/1/query?format=json&minlat=48.5&maxlat=55.5&minlon=13.5&maxlon=24.5&starttime=…&limit=…` → `200`, GeoJSON FeatureCollection. No key.
+- **Sample:** `{"id":"20261016_0000213","geometry":{"type":"Point","coordinates":[16.1008,51.5633,-1.0]},"properties":{"time":"2026-10-16T17:00:55.92Z","lastupdate":"2026-10-16T18:49:44Z","flynn_region":"POLAND","mag":2.5,"magtype":"m","depth":1.0,"evtype":"ke","auth":"EMSC","unid":"20261016_0000213"}}`
+- Last 30 days in the box: **50 events (48 POLAND, 2 SLOVAKIA)**, M 1.1–2.5, almost all LGOM (Polkowice/Lubin mining area). USGS (`earthquake.usgs.gov/fdsnws/event/1/query?format=geojson`) has only the 4 strongest (M3.9–4.4) → EMSC is the better source; USGS is public domain if ever needed as a fallback.
+- **Limits:** none documented; poll every 10–15 min with a `starttime` window of ~7 days.
+- **License ✅:** CC BY 4.0 (https://www.seismicportal.eu/terms.html). Credit: „EMSC-CSEM SeismicPortal, https://www.seismicportal.eu”.
+- **Proposed mapping:** new type `earthquake`, `source_event_id = unid`, point geometry, TERYT via `ST_Intersects` (events outside Poland dropped), `valid_from = time`, `valid_to = time + 24 h`, title „Wstrząs M2.5 – <powiat>”, severity by magnitude: <2.0 → 0, 2.0–2.9 → 1, 3.0–3.9 → 2, ≥4.0 → 3 (to confirm). Fixture: `ingest/tests/fixtures/emsc_events.json`.
+
+## 10. Gamma dose rate (PAA / EURDEP) ❌ no open machine-readable source (2026-10-16)
+
+- PAA map portal `https://monitoring.paa.gov.pl/maps-portal/` answers scripted requests with a **Web Application Firewall block page** („This transfer is blocked”); no documented API.
+- dane.gov.pl only has **biweekly PDF/table reports** („Rozkład mocy dawki promieniowania gamma …”), not real-time data.
+- EURDEP (JRC): public maps only; „Authorized users can do more such as unlimited access … through various web-services”. No open endpoint found behind the public map.
+- **Recommendation:** ask PAA (or JRC) for data access/terms before building anything. Not implementable today without bypassing a WAF or an authorization scheme.
+
+## 11. Power outages (Tauron, PGE, Energa, Enea, Stoen) ⚠️ no open data (2026-10-16)
+
+- dane.gov.pl: no outage datasets.
+- Operators only publish their own web pages (`tauron-dystrybucja.pl/wylaczenia`, `wylaczenia.operator.enea.pl`, `energa-operator.pl/uslugi/awarie-i-wylaczenia`); PGE `power-outage.gkpge.pl` returns **403** to scripts; Stoen URL 404.
+- Data exists only behind each site's internal (undocumented) endpoints; **no license or terms for reuse** found. Five different formats, high maintenance.
+- **Recommendation:** not without written permission from the operators (or an official open dataset). Marked unclear — not implemented.
+
+## 12. PKP PLK „Otwarte Dane Kolejowe” – rail disruptions ✅ with API key (2026-10-16)
+
+- **API:** `https://pdp-api.plk-sa.pl` („Open Railway Data API” v1.1.4, Swagger at `/swagger/v1/swagger.json`). **`GET /api/v1/disruptions`** – disruptions on railway lines (params `dateFrom`, `dateTo`, `stations`, carriers…). Also real-time train operations and schedules.
+- Response (schema): `DisruptionResponseDto {generatedAt, disruptions[], disruptionTypes, stations}`, `DisruptionDto {disruptionId, disruptionTypeCode, startStationId, endStationId, message, affectedRoutes}`. Stations dictionary (`/api/v1/dictionaries/stations`) to resolve coordinates – **to verify** that it has lat/lon.
+- **Key required:** header `X-Api-Key`; request via form on https://pdp-api.plk-sa.pl/ (project name, e-mail, usage tier), **manual activation in 3–5 working days**. Without a key: `401 MissingKey`. → **The owner must apply** (personal data – not done by Claude).
+- **Limits:** Basic 100/h, 1 000/day (enough for polling every 15 min); Standard 500/h; Premium 2 000/h.
+- **Terms ✅ (v1.0, from 2025-12-31, `/api/v1/terms`):** must credit „PKP Polskie Linie Kolejowe S.A.” when publishing; forbidden: commercial resale of raw data without consent, bypassing limits, misleading about the source, sharing the key. Non-commercial map use fits.
+- **Proposed mapping:** type `rail_disruption`, `source_event_id = disruptionId`, geometry = line between start/end station (or point when equal), TERYT via `ST_Intersects`, title from `disruptionTypeCode` + stations, description = `message`; severity from disruption type (to decide once the type dictionary is visible with a key). Sample response not yet verified.
+
 ## Decisions (accepted 2026-10-15)
 
 1. **Hydro warnings** → assigned to whole województwa from `obszary[].wojewodztwo` (coarse, no catchment geometry available).
