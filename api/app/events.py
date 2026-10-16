@@ -11,6 +11,7 @@ EventType = Literal[
     "fire_hotspot",
     "road_incident",
     "gps_interference",
+    "earthquake",
 ]
 EVENT_TYPES: tuple[str, ...] = get_args(EventType)
 
@@ -22,6 +23,7 @@ CACHE_TTL_S = {
     "fire_hotspot": 300,
     "road_incident": 300,
     "gps_interference": 60,
+    "earthquake": 300,
 }
 MAX_FEATURES = 5000
 
@@ -34,12 +36,13 @@ PROPERTIES = """
 """
 
 # Active = not ended yet (includes warnings that start later, e.g. tonight's fog).
-# List geometry is simplified (~1 km) – warning areas can span hundreds of powiaty.
+# List geometry is simplified (~1.5 km, 4 decimals ≈ 11 m) – warning areas can span hundreds of
+# powiaty; this halves the hydro/meteo payload. The detail endpoint keeps full geometry.
 EVENTS_SQL = text(f"""
     SELECT json_build_object('type', 'FeatureCollection', 'features', coalesce(json_agg(
         json_build_object(
             'type', 'Feature', 'id', id,
-            'geometry', ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.01), 5)::json,
+            'geometry', ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.02), 4)::json,
             'properties', json_build_object({PROPERTIES})
         ) ORDER BY severity DESC, valid_from DESC NULLS LAST), '[]'::json))::text
     FROM (

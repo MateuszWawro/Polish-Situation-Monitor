@@ -1,6 +1,5 @@
-"""Endpoints against PostGIS with imported admin_units. Skipped without DATABASE_URL."""
+"""Endpoints against PostGIS with imported admin_units. Skipped without TEST_DATABASE_URL."""
 
-import os
 import uuid
 from collections.abc import Iterator
 
@@ -10,10 +9,11 @@ from sqlalchemy import text
 
 from app.db import get_engine
 from app.main import app
+from tests.conftest import needs_db
 
-pytestmark = pytest.mark.skipif("DATABASE_URL" not in os.environ, reason="needs PostGIS")
+pytestmark = needs_db
 client = TestClient(app)
-SOURCES = {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia", "adsb_lol"}
+SOURCES = {"imgw_meteo", "imgw_hydro", "gios", "firms", "gddkia", "adsb_lol", "emsc"}
 
 INSERT = text("""
     INSERT INTO events (source, source_event_id, type, severity, title, geom, teryt_powiat,
@@ -76,13 +76,7 @@ def test_event_detail(events: dict[str, uuid.UUID]) -> None:
 
 
 def test_sources_status_lists_all_sources() -> None:
-    # Runs against the shared dev DB: restore the real row afterwards.
     with get_engine().begin() as conn:
-        saved = (
-            conn.execute(text("SELECT * FROM source_status WHERE source = 'imgw_meteo'"))
-            .mappings()
-            .one_or_none()
-        )
         conn.execute(
             text("""
             INSERT INTO source_status (source, last_success_at, expected_interval_s)
@@ -91,24 +85,10 @@ def test_sources_status_lists_all_sources() -> None:
                 expected_interval_s = 600
         """)
         )
-    try:
-        status = {s["source"]: s for s in client.get("/api/sources/status").json()}
-        assert set(status) == SOURCES
-        assert status["imgw_meteo"]["stale"] is True  # 31 min > 3 × 10 min
-        assert status["imgw_meteo"]["age_s"] >= 31 * 60
-    finally:
-        with get_engine().begin() as conn:
-            conn.execute(text("DELETE FROM source_status WHERE source = 'imgw_meteo'"))
-            if saved:
-                conn.execute(
-                    text("""
-                    INSERT INTO source_status (source, last_success_at, last_error,
-                        last_error_at, expected_interval_s)
-                    VALUES (:source, :last_success_at, :last_error, :last_error_at,
-                        :expected_interval_s)
-                """),
-                    dict(saved),
-                )
+    status = {s["source"]: s for s in client.get("/api/sources/status").json()}
+    assert set(status) == SOURCES
+    assert status["imgw_meteo"]["stale"] is True  # 31 min > 3 × 10 min
+    assert status["imgw_meteo"]["age_s"] >= 31 * 60
 
 
 def test_health_checks_database() -> None:
@@ -161,7 +141,7 @@ def test_water_levels() -> None:
 
 def test_admin_bboxes() -> None:
     body = client.get("/api/admin-units/bboxes").json()
-    assert len(body) >= 370
+    assert set(body) == {"1261", "1465", "1661", "1807", "1861", "2061"}  # testdb fixture
     west, south, east, north = body["1861"]  # Krosno
     assert 21.6 < west < east < 21.9 and 49.6 < south < north < 49.8
 

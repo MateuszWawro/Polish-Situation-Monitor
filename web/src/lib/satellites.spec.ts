@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { orbitalPeriodMin, parseEntries, positionsAt, type SatTle } from './satellites';
+import {
+	RESCAN_MS,
+	createTracker,
+	orbitalPeriodMin,
+	parseEntries,
+	positionsAt,
+	type SatTle
+} from './satellites';
 
 const ISS: SatTle = {
 	norad_id: 25544,
@@ -47,5 +54,31 @@ describe('satellites', () => {
 	it('estimates an orbital period around 90 min for LEO', () => {
 		expect(orbitalPeriodMin(420)).toBeGreaterThan(90);
 		expect(orbitalPeriodMin(420)).toBeLessThan(94);
+	});
+});
+
+describe('two-phase tracker', () => {
+	const entries = parseEntries([ISS]);
+	const t0 = new Date('2026-10-15T12:00:00Z');
+	const [lon, lat] = positionsAt(entries, t0, WORLD).features[0].geometry.coordinates;
+	// A Poland-sized box the ISS is inside at t0 and leaves within ~2 minutes.
+	const box: [[number, number], [number, number]] = [
+		[lon - 5, lat - 3],
+		[lon + 5, lat + 3]
+	];
+
+	it('matches full propagation second by second across rescans', () => {
+		const tracker = createTracker(entries, box);
+		for (let s = 0; s <= 120; s += 1) {
+			const when = new Date(t0.getTime() + s * 1000);
+			const ids = (fc: ReturnType<typeof positionsAt>) => fc.features.map((f) => f.id);
+			expect(ids(tracker.positions(when))).toEqual(ids(positionsAt(entries, when, box)));
+		}
+	});
+
+	it('keeps no candidates when nothing is near', () => {
+		const tracker = createTracker(entries, EMPTY);
+		tracker.positions(new Date(t0.getTime() + RESCAN_MS * 3));
+		expect(tracker.candidateCount).toBeLessThanOrEqual(1);
 	});
 });

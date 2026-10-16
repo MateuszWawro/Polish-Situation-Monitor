@@ -11,6 +11,9 @@
 		LAYERS,
 		ROAD_ICONS,
 		layerFeatures,
+		DETAIL_ZOOM,
+		effectiveMinSeverity,
+		quakeRadius,
 		SEVERITY_COLORS,
 		type EventProps,
 		type EventType,
@@ -26,7 +29,7 @@
 	import {
 		SAT_GROUPS,
 		parseEntries,
-		positionsAt,
+		createTracker,
 		type SatEntry,
 		type SatProps,
 		type SatTle
@@ -56,6 +59,8 @@
 		onsatellite?: (sat: SatProps) => void;
 		/** Count of satellites currently over Poland, emitted each tick. */
 		onsatcount?: (n: number) => void;
+		/** Tells the page whether the overview thresholds are active (for the legend note). */
+		ondetailchange?: (detailed: boolean) => void;
 	}
 	let {
 		data,
@@ -71,26 +76,34 @@
 		onaircraft,
 		satelliteTles = [],
 		onsatellite,
-		onsatcount
+		onsatcount,
+		ondetailchange
 	}: Props = $props();
 
-	// Parsed SGP4 records; rebuilt only when the TLE set changes, then propagated every second.
-	// Rebuilt only when the TLE set changes, then propagated every second.
+	// Rough box around Poland for the satellite filter (the map's own limits are computed per
+	// screen size in lockToPoland).
+	const POLAND_MAX_BOUNDS: [[number, number], [number, number]] = [
+		[12.2, 48.4],
+		[26.0, 55.6]
+	];
+
+	// Parsed SGP4 records, rebuilt only when the TLE set changes; the tracker propagates only
+	// satellites near Poland each second (see createTracker).
 	const satEntries: SatEntry[] = $derived(parseEntries(satelliteTles));
+	const satTracker = $derived(createTracker(satEntries, POLAND_MAX_BOUNDS));
 	let satTimer: ReturnType<typeof setInterval> | undefined;
 
-	/** Propagate ~every second (a LEO satellite moves ~7.5 km/s, so slower looks jumpy);
-	 *  on phones, ease off to 2 s when many satellites are tracked (e.g. Starlink on). */
+	/** Propagate ~every second (a LEO satellite moves ~7.5 km/s, so slower looks jumpy).
+	 *  Skipped while the tab is hidden: nobody sees it, and it costs battery. */
 	function startSatellites(m: MlMap): void {
-		const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 719px)').matches;
 		const tick = () => {
 			const src = m.getSource('satellites') as GeoJSONSource | undefined;
-			if (src) {
-				const fc = positionsAt(satEntries, new Date(), POLAND_MAX_BOUNDS);
+			if (src && !document.hidden) {
+				const fc = satTracker.positions(new Date());
 				src.setData(fc);
 				onsatcount?.(fc.features.length);
 			}
-			satTimer = setTimeout(tick, phone && satEntries.length > 2000 ? 2000 : 1000);
+			satTimer = setTimeout(tick, 1000);
 		};
 		tick();
 	}
@@ -101,6 +114,8 @@
 	let container: HTMLDivElement;
 	let map: MlMap | undefined = $state();
 	let loaded = $state(false);
+	/** Zoomed in past DETAIL_ZOOM: everything is drawn. */
+	let detailed = $state(false);
 
 	// Places: violet, outside the severity palette so a place is never mistaken for a warning.
 	const PLACE_COLOR = '#6f42c1';
@@ -119,6 +134,21 @@
 		SEVERITY_COLORS[2],
 		SEVERITY_COLORS[3]
 	] as unknown as string;
+
+	/** Per-severity value (levels 0–3) as a MapLibre expression. */
+	const bySeverity = (s0: number, s1: number, s2: number, s3: number) =>
+		['match', ['get', 'severity'], 0, s0, 1, s1, 2, s2, s3] as unknown as number;
+	/** Grows with zoom (5 → 9) and is multiplied by a per-feature factor. */
+	const zoomScaled = (atZ5: number, atZ9: number, factor: number) =>
+		[
+			'interpolate',
+			['linear'],
+			['zoom'],
+			5,
+			['*', atZ5, factor],
+			9,
+			['*', atZ9, factor]
+		] as unknown as number;
 
 	const layerIds = (layer: LayerDef) => {
 		if (layer.kind === 'area')
@@ -156,13 +186,6 @@
 		...AIRCRAFT_CLASSES.flatMap((c) => [c.id, c.color]),
 		'#d8dee6'
 	] as unknown as string;
-
-	// Rough box around Poland for the satellite filter (the map's own limits are computed per
-	// screen size in lockToPoland).
-	const POLAND_MAX_BOUNDS: [[number, number], [number, number]] = [
-		[12.2, 48.4],
-		[26.0, 55.6]
-	];
 
 	/** Room for the floating layers panel on wide screens, so it doesn't cover western Poland. */
 	const fitPadding = (width: number) => {
@@ -271,13 +294,15 @@
 					new AttributionControl({
 						compact: true,
 						customAttribution: [
-							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL), CelesTrak',
+							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL), CelesTrak, EMSC-CSEM (CC BY 4.0)',
 							'<a href="/zrodla">źródła i licencje</a>'
 						]
 					}),
 					'bottom-left'
 				);
-				m.on('load', async () => {
+				// 'style.load', not 'load': 'load' waits for the first full basemap render (all
+				// visible tiles), which kept events and the Poland frame off screen for seconds.
+				m.once('style.load', async () => {
 					await loadIcons(m);
 					// Poland outline: dim everything else and draw a crisp, softly glowing border.
 					try {
@@ -326,8 +351,11 @@
 									id: `${layer.id}-fill`,
 									type: 'fill',
 									source: layer.id,
-									// Low opacity: overlapping warnings stack up.
-									paint: { 'fill-color': severityColor, 'fill-opacity': 0.12 }
+									// Low opacity (overlapping warnings stack up), stronger for higher levels.
+									paint: {
+										'fill-color': severityColor,
+										'fill-opacity': bySeverity(0.1, 0.1, 0.16, 0.24)
+									}
 								});
 							m.addLayer({
 								id: `${layer.id}-line`,
@@ -337,7 +365,7 @@
 									? { 'line-color': DROUGHT_COLOR, 'line-width': 2, 'line-dasharray': [3, 2] }
 									: layer.dotted
 										? { 'line-color': severityColor, 'line-width': 1.5, 'line-dasharray': [1, 1.5] }
-										: { 'line-color': severityColor, 'line-width': 1.5 }
+										: { 'line-color': severityColor, 'line-width': bySeverity(1.2, 1.2, 1.8, 2.6) }
 							});
 						} else if (layer.kind === 'icon') {
 							m.addLayer({
@@ -346,10 +374,28 @@
 								source: layer.id,
 								layout: {
 									'icon-image': ['concat', 'road-', ['to-string', ['get', 'severity']]],
-									'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 9, 1],
+									'icon-size': zoomScaled(0.6, 1, bySeverity(0.8, 0.8, 1, 1.3)),
 									'icon-allow-overlap': true,
 									// closures drawn on top of roadworks
 									'symbol-sort-key': ['get', 'severity']
+								},
+								paint: { 'icon-opacity': bySeverity(0.7, 0.7, 1, 1) }
+							});
+						} else if (layer.ring) {
+							// Hollow target rings sized by magnitude band: unmistakable next to the
+							// filled air-quality dots, and overlapping tremors stay readable.
+							const r = (s: number) => quakeRadius(s) / 9;
+							m.addLayer({
+								id: `${layer.id}-circle`,
+								type: 'circle',
+								source: layer.id,
+								paint: {
+									'circle-color': severityColor,
+									'circle-opacity': 0.12,
+									'circle-radius': zoomScaled(5, 9, bySeverity(r(0), r(1), r(2), r(3))),
+									'circle-stroke-color': severityColor,
+									'circle-stroke-width': bySeverity(1.5, 2, 2.5, 3),
+									'circle-stroke-opacity': bySeverity(0.7, 0.95, 1, 1)
 								}
 							});
 						} else {
@@ -359,8 +405,10 @@
 								source: layer.id,
 								paint: {
 									'circle-color': severityColor,
-									// Small at country zoom (hundreds of stations), larger when zoomed in.
-									'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 9, 7],
+									// Small at country zoom (hundreds of stations), larger when zoomed in;
+									// size and opacity follow severity so the serious ones stand out.
+									'circle-radius': zoomScaled(3.5, 7, bySeverity(0.7, 0.9, 1.1, 1.4)),
+									'circle-opacity': bySeverity(0.55, 0.9, 1, 1),
 									'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 9, 1.5],
 									'circle-stroke-color': '#0a0d12'
 								}
@@ -450,6 +498,13 @@
 						zoomLevel = m.getZoom().toFixed(1);
 					};
 					m.on('move', showCenter);
+					// Re-filter only when crossing the detail threshold, not on every zoom step.
+					m.on('zoomend', () => {
+						const d = m.getZoom() >= DETAIL_ZOOM;
+						if (d !== detailed) ondetailchange?.((detailed = d));
+					});
+					detailed = m.getZoom() >= DETAIL_ZOOM;
+					ondetailchange?.(detailed);
 					m.on('mousemove', (e: MapMouseEvent) => (cursor = fmt(e.lngLat.lng, e.lngLat.lat)));
 					m.on('mouseout', showCenter);
 					showCenter();
@@ -477,7 +532,8 @@
 			for (const id of layerIds(layer)) {
 				map.setLayoutProperty(id, 'visibility', visible[layer.id] ? 'visible' : 'none');
 				// Filtered features are not rendered, so clicks don't hit them either.
-				map.setFilter(id, ['>=', ['get', 'severity'], minSeverity]);
+				const min = effectiveMinSeverity(layer, minSeverity, detailed ? DETAIL_ZOOM : 0);
+				map.setFilter(id, ['>=', ['get', 'severity'], min]);
 			}
 		}
 	});

@@ -8,8 +8,10 @@ export type EventType =
 	| 'air_quality'
 	| 'fire_hotspot'
 	| 'road_incident'
-	| 'gps_interference';
-export type SourceId = 'imgw_meteo' | 'imgw_hydro' | 'gios' | 'firms' | 'gddkia' | 'adsb_lol';
+	| 'gps_interference'
+	| 'earthquake';
+export type SourceId =
+	'imgw_meteo' | 'imgw_hydro' | 'gios' | 'firms' | 'gddkia' | 'adsb_lol' | 'emsc';
 
 export interface EventProps {
 	id: string;
@@ -47,9 +49,13 @@ export interface LayerDef {
 	outline?: boolean;
 	/** Dotted border in the severity colour, to tell estimated areas from official warnings. */
 	dotted?: boolean;
+	/** Points drawn as hollow rings (seismic events), so they never read as air-quality dots. */
+	ring?: boolean;
 	/** Short explanation shown under the layer name. */
 	note?: string;
 	defaultVisible?: boolean;
+	/** Below DETAIL_ZOOM only events from this severity are drawn (country view stays legible). */
+	overviewMinSeverity?: number;
 	/** Anchor of the source's section on /zrodla (license and attribution). */
 	sourceAnchor: string;
 	sourceUrl: string;
@@ -103,6 +109,7 @@ export const LAYERS: LayerDef[] = [
 	{
 		id: 'air_quality',
 		type: 'air_quality',
+		overviewMinSeverity: 1, // "good" stations (green) only when zoomed in
 		sourceAnchor: 'gios',
 		sourceUrl: 'https://powietrze.gios.gov.pl/',
 		label: 'Jakość powietrza',
@@ -123,6 +130,7 @@ export const LAYERS: LayerDef[] = [
 	{
 		id: 'road_incident',
 		type: 'road_incident',
+		overviewMinSeverity: 2, // routine roadworks only when zoomed in
 		sourceAnchor: 'gddkia',
 		sourceUrl: 'https://www.gov.pl/web/gddkia',
 		label: 'Drogi',
@@ -141,6 +149,18 @@ export const LAYERS: LayerDef[] = [
 		source: 'adsb_lol',
 		sourceName: 'adsb.lol',
 		kind: 'area'
+	},
+	{
+		id: 'earthquake',
+		type: 'earthquake',
+		ring: true,
+		sourceAnchor: 'emsc',
+		sourceUrl: 'https://www.seismicportal.eu/',
+		label: 'Wstrząsy sejsmiczne',
+		note: 'trzęsienia ziemi i wstrząsy górnicze, ostatnia doba',
+		source: 'emsc',
+		sourceName: 'EMSC',
+		kind: 'point'
 	}
 ];
 
@@ -208,6 +228,19 @@ export const ROAD_ICONS: { severity: number; label: string; svg: string }[] = [
 	}
 ];
 
+// Seismic rings by severity (= magnitude band, docs/SOURCES.md §9), for the legend.
+export const QUAKE_BANDS: { severity: number; label: string }[] = [
+	{ severity: 3, label: 'M ≥ 4' },
+	{ severity: 2, label: 'M 3–3,9' },
+	{ severity: 1, label: 'M 2–2,9' },
+	{ severity: 0, label: 'M < 2' }
+];
+
+/** Ring radius at zoom 9 (px): grows with magnitude band. Shared by map and legend. */
+export function quakeRadius(severity: number): number {
+	return [5, 7, 10, 14][Math.min(Math.max(severity, 0), 3)];
+}
+
 export interface EventRow {
 	key: string;
 	title: string;
@@ -274,4 +307,13 @@ export function sourceHealth(status: SourceStatus, lastAttemptOk: boolean | null
 export function formatInterval(seconds: number | null): string {
 	if (!seconds) return '—';
 	return seconds < 3600 ? `co ${Math.round(seconds / 60)} min` : `co ${seconds / 3600} godz.`;
+}
+
+/** Zoom from which every event is drawn; below it, layers use `overviewMinSeverity`. */
+export const DETAIL_ZOOM = 7.5;
+
+/** Severity threshold actually applied to a layer at a given zoom. */
+export function effectiveMinSeverity(layer: LayerDef, userMin: number, zoom: number): number {
+	const overview = zoom < DETAIL_ZOOM ? (layer.overviewMinSeverity ?? 0) : 0;
+	return Math.max(userMin, overview);
 }

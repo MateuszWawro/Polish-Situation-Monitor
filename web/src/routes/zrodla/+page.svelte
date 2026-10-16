@@ -44,6 +44,16 @@
 				'Stopnie: zamknięcie drogi → 3, ruch wahadłowy / sygnalizacja / ruch dwukierunkowy na jednej jezdni / awaria mostu / zdarzenie → 2, roboty i ograniczenia → 1. „Zamknięcie” pochodzi z flagi źródła i może dotyczyć tylko jednej jezdni lub części pojazdów.'
 		},
 		{
+			anchor: 'emsc',
+			name: 'EMSC – trzęsienia ziemi i wstrząsy górnicze',
+			url: 'https://www.seismicportal.eu/',
+			terms: 'https://www.seismicportal.eu/terms.html',
+			termsLabel: 'Warunki EMSC SeismicPortal (licencja CC BY 4.0)',
+			attribution: ['EMSC-CSEM SeismicPortal, https://www.seismicportal.eu (CC BY 4.0).'],
+			notes:
+				'Zdarzenia z ostatnich 7 dni w rejonie Polski, na mapie przez dobę od wstrząsu; pokazujemy tylko te, których epicentrum leży w Polsce. Większość to wstrząsy górnicze (LGOM, Górny Śląsk). Magnituda → stopień: poniżej 2 → 0, 2–2,9 → 1, 3–3,9 → 2, od 4 → 3. Przetworzenie: tytuł i opis po polsku, nazwa regionu przetłumaczona.'
+		},
+		{
 			anchor: 'celestrak',
 			name: 'CelesTrak – dane orbitalne satelitów (TLE)',
 			url: 'https://celestrak.org/',

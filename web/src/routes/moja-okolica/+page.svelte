@@ -11,6 +11,7 @@
 	import { powiatBboxes } from '#lib/bboxes.ts';
 	import { buildMapUrl } from '#lib/mapUrl.ts';
 	import { getJson } from '#lib/offline.svelte.ts';
+	import { poll } from '#lib/poll.ts';
 
 	const REFRESH_MS = 5 * 60_000;
 
@@ -175,11 +176,10 @@
 			await refresh();
 			ready = true;
 		});
-		const timers = [
-			setInterval(refresh, REFRESH_MS),
-			setInterval(() => (now = Date.now()), 30_000)
-		];
-		return () => timers.forEach(clearInterval);
+		return poll([
+			{ run: refresh, everyMs: REFRESH_MS },
+			{ run: () => (now = Date.now()), everyMs: 30_000 }
+		]);
 	});
 </script>
 
