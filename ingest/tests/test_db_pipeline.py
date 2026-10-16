@@ -12,6 +12,7 @@ import pytest
 import respx
 
 from ingest.adsb_gps import AdsbGpsWorker
+from ingest.emsc import EmscWorker
 from ingest.firms import FirmsWorker
 from ingest.imgw_hydro import ImgwHydroWarningsWorker
 from ingest.imgw_meteo import ImgwMeteoWorker
@@ -247,3 +248,25 @@ def test_satellites_snapshot_replaced(conn: psycopg.Connection) -> None:
     run_sats(["visual"])
     assert conn.execute("SELECT grp FROM satellites").fetchall() == [("visual",)]
     conn.execute("DELETE FROM satellites")
+
+
+def test_earthquakes_outside_poland_dropped(conn: psycopg.Connection) -> None:
+    conn.execute("DELETE FROM events WHERE source = 'emsc'")
+    try:
+        worker = EmscWorker(sleep=lambda _: None)
+        payload = load("emsc_events.json")
+        outside = {**payload["features"][0], "geometry": {"type": "Point",
+                   "coordinates": [19.1, 48.9]}}  # fmt: skip
+        outside["properties"] = {**outside["properties"], "unid": "sk1"}
+        payload["features"].append(outside)
+        with respx.mock, httpx.Client() as client:
+            respx.get(url__startswith=worker.url).mock(
+                return_value=httpx.Response(200, json=payload)
+            )
+            worker.run(conn, client)
+        ids = [
+            r[0] for r in conn.execute("SELECT source_event_id FROM events WHERE source = 'emsc'")
+        ]
+        assert len(ids) == 4 and "sk1" not in ids
+    finally:
+        conn.execute("DELETE FROM events WHERE source = 'emsc'")

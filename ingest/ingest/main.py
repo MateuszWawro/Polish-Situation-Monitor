@@ -12,6 +12,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from ingest import satellites
 from ingest.adsb_gps import AdsbGpsWorker
 from ingest.base import Worker
+from ingest.emsc import EmscWorker
 from ingest.firms import FirmsWorker
 from ingest.gddkia import GddkiaWorker
 from ingest.gios import GiosWorker
@@ -28,6 +29,7 @@ WORKERS: list[Worker[Any]] = [
     FirmsWorker(),
     GddkiaWorker(),
     AdsbGpsWorker(),
+    EmscWorker(),
 ]
 
 RETENTION_SQL = [
