@@ -134,6 +134,21 @@
 		SEVERITY_COLORS[3]
 	] as unknown as string;
 
+	/** Per-severity value (levels 0–3) as a MapLibre expression. */
+	const bySeverity = (s0: number, s1: number, s2: number, s3: number) =>
+		['match', ['get', 'severity'], 0, s0, 1, s1, 2, s2, s3] as unknown as number;
+	/** Grows with zoom (5 → 9) and is multiplied by a per-feature factor. */
+	const zoomScaled = (atZ5: number, atZ9: number, factor: number) =>
+		[
+			'interpolate',
+			['linear'],
+			['zoom'],
+			5,
+			['*', atZ5, factor],
+			9,
+			['*', atZ9, factor]
+		] as unknown as number;
+
 	const layerIds = (layer: LayerDef) => {
 		if (layer.kind === 'area')
 			return layer.outline ? [`${layer.id}-line`] : [`${layer.id}-fill`, `${layer.id}-line`];
@@ -335,8 +350,11 @@
 									id: `${layer.id}-fill`,
 									type: 'fill',
 									source: layer.id,
-									// Low opacity: overlapping warnings stack up.
-									paint: { 'fill-color': severityColor, 'fill-opacity': 0.12 }
+									// Low opacity (overlapping warnings stack up), stronger for higher levels.
+									paint: {
+										'fill-color': severityColor,
+										'fill-opacity': bySeverity(0.1, 0.1, 0.16, 0.24)
+									}
 								});
 							m.addLayer({
 								id: `${layer.id}-line`,
@@ -346,7 +364,7 @@
 									? { 'line-color': DROUGHT_COLOR, 'line-width': 2, 'line-dasharray': [3, 2] }
 									: layer.dotted
 										? { 'line-color': severityColor, 'line-width': 1.5, 'line-dasharray': [1, 1.5] }
-										: { 'line-color': severityColor, 'line-width': 1.5 }
+										: { 'line-color': severityColor, 'line-width': bySeverity(1.2, 1.2, 1.8, 2.6) }
 							});
 						} else if (layer.kind === 'icon') {
 							m.addLayer({
@@ -355,11 +373,12 @@
 								source: layer.id,
 								layout: {
 									'icon-image': ['concat', 'road-', ['to-string', ['get', 'severity']]],
-									'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 9, 1],
+									'icon-size': zoomScaled(0.6, 1, bySeverity(0.8, 0.8, 1, 1.3)),
 									'icon-allow-overlap': true,
 									// closures drawn on top of roadworks
 									'symbol-sort-key': ['get', 'severity']
-								}
+								},
+								paint: { 'icon-opacity': bySeverity(0.7, 0.7, 1, 1) }
 							});
 						} else {
 							m.addLayer({
@@ -368,8 +387,10 @@
 								source: layer.id,
 								paint: {
 									'circle-color': severityColor,
-									// Small at country zoom (hundreds of stations), larger when zoomed in.
-									'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 9, 7],
+									// Small at country zoom (hundreds of stations), larger when zoomed in;
+									// size and opacity follow severity so the serious ones stand out.
+									'circle-radius': zoomScaled(3.5, 7, bySeverity(0.7, 0.9, 1.1, 1.4)),
+									'circle-opacity': bySeverity(0.55, 0.9, 1, 1),
 									'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 9, 1.5],
 									'circle-stroke-color': '#0a0d12'
 								}
