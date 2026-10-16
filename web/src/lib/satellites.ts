@@ -69,9 +69,10 @@ export const SAT_GROUPS: {
 	{
 		id: 'starlink',
 		label: 'Starlink',
-		note: 'konstelacja, gęsto',
+		note: 'ok. 10 tys. satelitów, ~0,6 MB danych',
 		color: '#9aa5b1',
-		default: true
+		// Off by default: its TLE set is ~600 KB gzipped, more than the whole map library.
+		default: false
 	}
 ];
 
