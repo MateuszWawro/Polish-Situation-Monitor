@@ -217,3 +217,6 @@ Snapshot of 2026-10-15 (550 records): `typ` U=522, I=26, W=2; `rodzaj` U33=451, 
 7. **GPS interference** (accepted 2026-10-15): adsb.lol (ODbL) as the one non-official source, method as in §9, layer labelled as an estimate on the map and on `/zrodla`.
 8. **Aircraft layer** (accepted 2026-10-15): adsb.lol snapshot, classes and filters as in §10; latest positions only, LADD/PIA aircraft hidden.
 9. **Satellites** (accepted 2026-10-15): CelesTrak TLE, SGP4 in the browser (ADR 0003). Starlink on by default so the layer is not empty; see §11.
+10. **EMSC earthquakes** (accepted 2026-10-16): mapping as proposed in §9 – type `earthquake`, severity by magnitude (<2.0 → 0, 2.0–2.9 → 1, 3.0–3.9 → 2, ≥4.0 → 3), visible for 24 h from the event, poll every 15 min with a 7-day window. Title uses the EMSC region (translated, e.g. „Wstrząs M2.5 – Polska”), not the powiat. Map: hollow rings sized by magnitude band. Credit „EMSC-CSEM SeismicPortal, https://www.seismicportal.eu” (CC BY 4.0) on the map and on `/zrodla`.
+11. **Gamma dose rate** (§10) and **power outages** (§11): dropped by the owner (2026-10-16).
+12. **PKP PLK rail disruptions** (§12): waits for the owner's PKP PLK API key.
