@@ -11,6 +11,8 @@
 		LAYERS,
 		ROAD_ICONS,
 		layerFeatures,
+		DETAIL_ZOOM,
+		effectiveMinSeverity,
 		SEVERITY_COLORS,
 		type EventProps,
 		type EventType,
@@ -56,6 +58,8 @@
 		onsatellite?: (sat: SatProps) => void;
 		/** Count of satellites currently over Poland, emitted each tick. */
 		onsatcount?: (n: number) => void;
+		/** Tells the page whether the overview thresholds are active (for the legend note). */
+		ondetailchange?: (detailed: boolean) => void;
 	}
 	let {
 		data,
@@ -71,7 +75,8 @@
 		onaircraft,
 		satelliteTles = [],
 		onsatellite,
-		onsatcount
+		onsatcount,
+		ondetailchange
 	}: Props = $props();
 
 	// Rough box around Poland for the satellite filter (the map's own limits are computed per
@@ -108,6 +113,8 @@
 	let container: HTMLDivElement;
 	let map: MlMap | undefined = $state();
 	let loaded = $state(false);
+	/** Zoomed in past DETAIL_ZOOM: everything is drawn. */
+	let detailed = $state(false);
 
 	// Places: violet, outside the severity palette so a place is never mistaken for a warning.
 	const PLACE_COLOR = '#6f42c1';
@@ -277,7 +284,9 @@
 					}),
 					'bottom-left'
 				);
-				m.on('load', async () => {
+				// 'style.load', not 'load': 'load' waits for the first full basemap render (all
+				// visible tiles), which kept events and the Poland frame off screen for seconds.
+				m.once('style.load', async () => {
 					await loadIcons(m);
 					// Poland outline: dim everything else and draw a crisp, softly glowing border.
 					try {
@@ -450,6 +459,13 @@
 						zoomLevel = m.getZoom().toFixed(1);
 					};
 					m.on('move', showCenter);
+					// Re-filter only when crossing the detail threshold, not on every zoom step.
+					m.on('zoomend', () => {
+						const d = m.getZoom() >= DETAIL_ZOOM;
+						if (d !== detailed) ondetailchange?.((detailed = d));
+					});
+					detailed = m.getZoom() >= DETAIL_ZOOM;
+					ondetailchange?.(detailed);
 					m.on('mousemove', (e: MapMouseEvent) => (cursor = fmt(e.lngLat.lng, e.lngLat.lat)));
 					m.on('mouseout', showCenter);
 					showCenter();
@@ -477,7 +493,8 @@
 			for (const id of layerIds(layer)) {
 				map.setLayoutProperty(id, 'visibility', visible[layer.id] ? 'visible' : 'none');
 				// Filtered features are not rendered, so clicks don't hit them either.
-				map.setFilter(id, ['>=', ['get', 'severity'], minSeverity]);
+				const min = effectiveMinSeverity(layer, minSeverity, detailed ? DETAIL_ZOOM : 0);
+				map.setFilter(id, ['>=', ['get', 'severity'], min]);
 			}
 		}
 	});
