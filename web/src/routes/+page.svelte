@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { FeatureCollection, Geometry } from 'geojson';
-	import { replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { MapPlace, MapViewState } from '#lib/geo.ts';
 	import { loadPlaces } from '#lib/places.ts';
 	import { buildMapUrl, parseMapUrl } from '#lib/mapUrl.ts';
 	import { shareLink } from '#lib/share.ts';
 	import { getJson } from '#lib/offline.svelte.ts';
+	import { poll } from '#lib/poll.ts';
 	import MapSearch from '#lib/MapSearch.svelte';
 	import { bboxPolygon, powiatBboxes } from '#lib/bboxes.ts';
 	import type { PlaceHit } from '#lib/search.ts';
@@ -15,7 +16,9 @@
 	import EventGroups from '#lib/EventGroups.svelte';
 	import StaleBanner from '#lib/StaleBanner.svelte';
 	import {
+		DETAIL_ZOOM,
 		LAYERS,
+		effectiveMinSeverity,
 		layerFeatures,
 		ROAD_ICONS,
 		SEVERITY_COLORS,
@@ -23,6 +26,7 @@
 		timeAgo,
 		type EventProps,
 		type EventType,
+		type LayerDef,
 		type SourceStatus
 	} from '#lib/events.ts';
 	import {
@@ -147,8 +151,16 @@
 		}
 	}
 	const MIN_SEVERITY_KEY = 'psm.minSeverity';
-	const countFrom = (fc: FeatureCollection | undefined) =>
-		fc?.features.filter((f) => (f.properties?.severity ?? 0) >= minSeverity).length;
+	/** Zoomed in past DETAIL_ZOOM (reported by the map); below it minor events are hidden. */
+	let detailed = $state(true);
+	/** What the map actually draws for a layer at the current zoom. */
+	const countFrom = (layer: LayerDef, fc: FeatureCollection | undefined) => {
+		const min = effectiveMinSeverity(layer, minSeverity, detailed ? DETAIL_ZOOM : 0);
+		return fc?.features.filter((f) => (f.properties?.severity ?? 0) >= min).length;
+	};
+	const hiddenInOverview = $derived(
+		!detailed && LAYERS.some((l) => visible[l.id] && (l.overviewMinSeverity ?? 0) > minSeverity)
+	);
 
 	function setMinSeverity(value: number) {
 		minSeverity = value;
@@ -174,8 +186,9 @@
 			view,
 			event: selected.length ? linkedEvent : undefined
 		});
+		// Shallow + replace: keeps the link shareable without navigating or filling history.
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved path + query
-		if (urlReady) replaceState(`${resolve('/')}${url}`, {});
+		if (urlReady) goto(`${resolve('/')}${url}`, { shallow: true, replace: true });
 	});
 
 	async function loadEvents() {
@@ -241,14 +254,13 @@
 		loadStatus();
 		loadAircraft();
 		loadSatellites();
-		const timers = [
-			setInterval(loadAircraft, AIRCRAFT_REFRESH_MS),
-			setInterval(loadSatellites, SAT_REFRESH_MS),
-			setInterval(loadEvents, EVENTS_REFRESH_MS),
-			setInterval(loadStatus, STATUS_REFRESH_MS),
-			setInterval(() => (now = Date.now()), 30_000)
-		];
-		return () => timers.forEach(clearInterval);
+		return poll([
+			{ run: loadAircraft, everyMs: AIRCRAFT_REFRESH_MS },
+			{ run: loadSatellites, everyMs: SAT_REFRESH_MS },
+			{ run: loadEvents, everyMs: EVENTS_REFRESH_MS },
+			{ run: loadStatus, everyMs: STATUS_REFRESH_MS },
+			{ run: () => (now = Date.now()), everyMs: 30_000 }
+		]);
 	});
 </script>
 
@@ -281,6 +293,7 @@
 		plane = null;
 	}}
 	onsatcount={(n) => (satOverPoland = n)}
+	ondetailchange={(d) => (detailed = d)}
 />
 
 <div class="banners" aria-live="polite">
@@ -318,6 +331,12 @@
 					</label>
 				{/each}
 			</div>
+			{#if hiddenInOverview}
+				<p class="overview-note">
+					Widok całego kraju: ukryto drobne zdarzenia (roboty drogowe, dobra jakość powietrza).
+					Przybliż mapę, aby zobaczyć wszystkie.
+				</p>
+			{/if}
 		</fieldset>
 		<fieldset>
 			<legend class="sr-only">Widoczne warstwy</legend>
@@ -329,7 +348,7 @@
 						<span class="layer-head">
 							<strong>{layer.label}</strong>
 							<span class="count mono"
-								>{countFrom(layerFeatures(layer, data[layer.type])) ?? '…'}</span
+								>{countFrom(layer, layerFeatures(layer, data[layer.type])) ?? '…'}</span
 							>
 						</span>
 						{#if layer.note}<small>{layer.note}</small>{/if}
@@ -550,6 +569,12 @@
 	}
 	.min-sev {
 		margin-bottom: 0.5rem;
+	}
+	.overview-note {
+		margin: 0.4rem 0 0;
+		font-size: 0.78rem;
+		line-height: 1.35;
+		color: var(--muted);
 	}
 	.min-sev legend {
 		margin-bottom: 0.35rem;

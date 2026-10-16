@@ -1,13 +1,9 @@
-import os
-
-import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.conftest import needs_db
 
-pytestmark = pytest.mark.skipif(
-    "DATABASE_URL" not in os.environ, reason="needs PostGIS with imported admin_units"
-)
+pytestmark = needs_db
 
 
 def test_admin_units_powiat_feature_collection() -> None:

@@ -34,12 +34,13 @@ PROPERTIES = """
 """
 
 # Active = not ended yet (includes warnings that start later, e.g. tonight's fog).
-# List geometry is simplified (~1 km) – warning areas can span hundreds of powiaty.
+# List geometry is simplified (~1.5 km, 4 decimals ≈ 11 m) – warning areas can span hundreds of
+# powiaty; this halves the hydro/meteo payload. The detail endpoint keeps full geometry.
 EVENTS_SQL = text(f"""
     SELECT json_build_object('type', 'FeatureCollection', 'features', coalesce(json_agg(
         json_build_object(
             'type', 'Feature', 'id', id,
-            'geometry', ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.01), 5)::json,
+            'geometry', ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.02), 4)::json,
             'properties', json_build_object({PROPERTIES})
         ) ORDER BY severity DESC, valid_from DESC NULLS LAST), '[]'::json))::text
     FROM (

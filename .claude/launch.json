@@ -40,6 +40,22 @@
         "4173"
       ],
       "port": 4173
+    },
+    {
+      "name": "web-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5174",
+        "--host",
+        "0.0.0.0"
+      ],
+      "port": 5174
     }
   ]
 }

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { getJson } from '#lib/offline.svelte.ts';
+	import { poll } from '#lib/poll.ts';
 	import {
 		LAYERS,
 		formatDate,
@@ -68,8 +69,10 @@
 
 	onMount(() => {
 		load();
-		const timers = [setInterval(load, 60_000), setInterval(() => (now = Date.now()), 30_000)];
-		return () => timers.forEach(clearInterval);
+		return poll([
+			{ run: load, everyMs: 60_000 },
+			{ run: () => (now = Date.now()), everyMs: 30_000 }
+		]);
 	});
 </script>
 

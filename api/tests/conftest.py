@@ -1,8 +1,12 @@
+import os
+import sys
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
 from app import cache
+from app.db import get_engine
 
 
 class FakeRedis:
@@ -35,3 +39,24 @@ def fake_redis(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRedis]:
 @pytest.fixture(autouse=True)
 def no_redis_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cache, "get_store", lambda: None)
+
+
+@pytest.fixture(scope="session")
+def test_db() -> Iterator[None]:
+    """Point the app at TEST_DATABASE_URL (never DATABASE_URL), freshly migrated."""
+    sys.path.insert(0, str(Path(__file__).parents[2] / "db"))
+    from testdb import prepare  # type: ignore[import-not-found]
+
+    url = os.environ["TEST_DATABASE_URL"]
+    prepare(url)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("DATABASE_URL", url)
+        get_engine.cache_clear()
+        yield
+    get_engine.cache_clear()
+
+
+needs_db = [
+    pytest.mark.skipif("TEST_DATABASE_URL" not in os.environ, reason="needs TEST_DATABASE_URL"),
+    pytest.mark.usefixtures("test_db"),
+]

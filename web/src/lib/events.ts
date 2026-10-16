@@ -50,6 +50,8 @@ export interface LayerDef {
 	/** Short explanation shown under the layer name. */
 	note?: string;
 	defaultVisible?: boolean;
+	/** Below DETAIL_ZOOM only events from this severity are drawn (country view stays legible). */
+	overviewMinSeverity?: number;
 	/** Anchor of the source's section on /zrodla (license and attribution). */
 	sourceAnchor: string;
 	sourceUrl: string;
@@ -103,6 +105,7 @@ export const LAYERS: LayerDef[] = [
 	{
 		id: 'air_quality',
 		type: 'air_quality',
+		overviewMinSeverity: 1, // "good" stations (green) only when zoomed in
 		sourceAnchor: 'gios',
 		sourceUrl: 'https://powietrze.gios.gov.pl/',
 		label: 'Jakość powietrza',
@@ -123,6 +126,7 @@ export const LAYERS: LayerDef[] = [
 	{
 		id: 'road_incident',
 		type: 'road_incident',
+		overviewMinSeverity: 2, // routine roadworks only when zoomed in
 		sourceAnchor: 'gddkia',
 		sourceUrl: 'https://www.gov.pl/web/gddkia',
 		label: 'Drogi',
@@ -274,4 +278,13 @@ export function sourceHealth(status: SourceStatus, lastAttemptOk: boolean | null
 export function formatInterval(seconds: number | null): string {
 	if (!seconds) return '—';
 	return seconds < 3600 ? `co ${Math.round(seconds / 60)} min` : `co ${seconds / 3600} godz.`;
+}
+
+/** Zoom from which every event is drawn; below it, layers use `overviewMinSeverity`. */
+export const DETAIL_ZOOM = 7.5;
+
+/** Severity threshold actually applied to a layer at a given zoom. */
+export function effectiveMinSeverity(layer: LayerDef, userMin: number, zoom: number): number {
+	const overview = zoom < DETAIL_ZOOM ? (layer.overviewMinSeverity ?? 0) : 0;
+	return Math.max(userMin, overview);
 }
