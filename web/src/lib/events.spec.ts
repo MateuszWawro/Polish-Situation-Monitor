@@ -3,6 +3,8 @@ import {
 	DETAIL_ZOOM,
 	effectiveMinSeverity,
 	LAYERS,
+	QUAKE_BANDS,
+	quakeRadius,
 	formatInterval,
 	inLayer,
 	formatRange,
@@ -116,5 +118,25 @@ describe('detail levels', () => {
 	it('never lowers the user filter', () => {
 		expect(effectiveMinSeverity(road, 3, 5.5)).toBe(3);
 		expect(effectiveMinSeverity(road, 3, 10)).toBe(3);
+	});
+});
+
+describe('earthquake layer', () => {
+	const quake = LAYERS.find((l) => l.id === 'earthquake')!;
+
+	it('is a ring point layer credited to EMSC', () => {
+		expect(quake).toMatchObject({ type: 'earthquake', kind: 'point', ring: true, source: 'emsc' });
+	});
+
+	it('grows the ring with the magnitude band and clamps out-of-range levels', () => {
+		const radii = [0, 1, 2, 3].map(quakeRadius);
+		expect([...radii].sort((a, b) => a - b)).toEqual(radii);
+		expect(new Set(radii).size).toBe(4);
+		expect(quakeRadius(-1)).toBe(radii[0]);
+		expect(quakeRadius(7)).toBe(radii[3]);
+	});
+
+	it('has a legend band for every severity', () => {
+		expect(QUAKE_BANDS.map((b) => b.severity).sort()).toEqual([0, 1, 2, 3]);
 	});
 });

@@ -21,6 +21,8 @@
 		effectiveMinSeverity,
 		layerFeatures,
 		ROAD_ICONS,
+		QUAKE_BANDS,
+		quakeRadius,
 		SEVERITY_COLORS,
 		SEVERITY_LABELS,
 		timeAgo,
@@ -424,6 +426,20 @@
 				</li>
 			{/each}
 		</ul>
+		<ul class="legend" aria-label="Legenda wstrząsów">
+			{#each QUAKE_BANDS as band (band.severity)}
+				<li>
+					<span class="icon" aria-hidden="true"
+						><span
+							class="ring"
+							style:border-color={SEVERITY_COLORS[band.severity]}
+							style:width="{quakeRadius(band.severity) * 1.1}px"
+							style:height="{quakeRadius(band.severity) * 1.1}px"
+						></span></span
+					>Wstrząs {band.label}
+				</li>
+			{/each}
+		</ul>
 		<p class="hint">Kliknij obszar lub punkt, aby zobaczyć szczegóły.</p>
 		<p class="share-view">
 			<button type="button" class="link" onclick={shareView}>Udostępnij ten widok ↗</button>
@@ -757,6 +773,16 @@
 		width: 1.1rem;
 		height: 1.1rem;
 		flex: none;
+	}
+	.icon:has(.ring) {
+		align-items: center;
+		justify-content: center;
+	}
+	.ring {
+		display: block;
+		border: 2px solid;
+		border-radius: 50%;
+		box-sizing: border-box;
 	}
 	.share-view {
 		display: flex;

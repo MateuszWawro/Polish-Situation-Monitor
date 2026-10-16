@@ -8,8 +8,10 @@ export type EventType =
 	| 'air_quality'
 	| 'fire_hotspot'
 	| 'road_incident'
-	| 'gps_interference';
-export type SourceId = 'imgw_meteo' | 'imgw_hydro' | 'gios' | 'firms' | 'gddkia' | 'adsb_lol';
+	| 'gps_interference'
+	| 'earthquake';
+export type SourceId =
+	'imgw_meteo' | 'imgw_hydro' | 'gios' | 'firms' | 'gddkia' | 'adsb_lol' | 'emsc';
 
 export interface EventProps {
 	id: string;
@@ -47,6 +49,8 @@ export interface LayerDef {
 	outline?: boolean;
 	/** Dotted border in the severity colour, to tell estimated areas from official warnings. */
 	dotted?: boolean;
+	/** Points drawn as hollow rings (seismic events), so they never read as air-quality dots. */
+	ring?: boolean;
 	/** Short explanation shown under the layer name. */
 	note?: string;
 	defaultVisible?: boolean;
@@ -145,6 +149,18 @@ export const LAYERS: LayerDef[] = [
 		source: 'adsb_lol',
 		sourceName: 'adsb.lol',
 		kind: 'area'
+	},
+	{
+		id: 'earthquake',
+		type: 'earthquake',
+		ring: true,
+		sourceAnchor: 'emsc',
+		sourceUrl: 'https://www.seismicportal.eu/',
+		label: 'Wstrząsy sejsmiczne',
+		note: 'trzęsienia ziemi i wstrząsy górnicze, ostatnia doba',
+		source: 'emsc',
+		sourceName: 'EMSC',
+		kind: 'point'
 	}
 ];
 
@@ -211,6 +227,19 @@ export const ROAD_ICONS: { severity: number; label: string; svg: string }[] = [
 		svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2 22.5 21H1.5Z" fill="#e8b420" stroke="#1b1f24" stroke-width="1.5"/><rect x="11" y="8.5" width="2" height="6.5" fill="#1b1f24"/><rect x="11" y="16.5" width="2" height="2" fill="#1b1f24"/></svg>'
 	}
 ];
+
+// Seismic rings by severity (= magnitude band, docs/SOURCES.md §9), for the legend.
+export const QUAKE_BANDS: { severity: number; label: string }[] = [
+	{ severity: 3, label: 'M ≥ 4' },
+	{ severity: 2, label: 'M 3–3,9' },
+	{ severity: 1, label: 'M 2–2,9' },
+	{ severity: 0, label: 'M < 2' }
+];
+
+/** Ring radius at zoom 9 (px): grows with magnitude band. Shared by map and legend. */
+export function quakeRadius(severity: number): number {
+	return [5, 7, 10, 14][Math.min(Math.max(severity, 0), 3)];
+}
 
 export interface EventRow {
 	key: string;

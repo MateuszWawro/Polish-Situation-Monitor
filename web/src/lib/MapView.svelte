@@ -13,6 +13,7 @@
 		layerFeatures,
 		DETAIL_ZOOM,
 		effectiveMinSeverity,
+		quakeRadius,
 		SEVERITY_COLORS,
 		type EventProps,
 		type EventType,
@@ -293,7 +294,7 @@
 					new AttributionControl({
 						compact: true,
 						customAttribution: [
-							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL), CelesTrak',
+							'Dane: IMGW-PIB (przetworzone), GIOŚ, NASA FIRMS, GDDKiA, GUGiK, adsb.lol (ODbL), CelesTrak, EMSC-CSEM (CC BY 4.0)',
 							'<a href="/zrodla">źródła i licencje</a>'
 						]
 					}),
@@ -379,6 +380,23 @@
 									'symbol-sort-key': ['get', 'severity']
 								},
 								paint: { 'icon-opacity': bySeverity(0.7, 0.7, 1, 1) }
+							});
+						} else if (layer.ring) {
+							// Hollow target rings sized by magnitude band: unmistakable next to the
+							// filled air-quality dots, and overlapping tremors stay readable.
+							const r = (s: number) => quakeRadius(s) / 9;
+							m.addLayer({
+								id: `${layer.id}-circle`,
+								type: 'circle',
+								source: layer.id,
+								paint: {
+									'circle-color': severityColor,
+									'circle-opacity': 0.12,
+									'circle-radius': zoomScaled(5, 9, bySeverity(r(0), r(1), r(2), r(3))),
+									'circle-stroke-color': severityColor,
+									'circle-stroke-width': bySeverity(1.5, 2, 2.5, 3),
+									'circle-stroke-opacity': bySeverity(0.7, 0.95, 1, 1)
+								}
 							});
 						} else {
 							m.addLayer({
