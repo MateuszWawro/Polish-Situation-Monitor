@@ -8,6 +8,7 @@
 	import { buildMapUrl, parseMapUrl } from '#lib/mapUrl.ts';
 	import { shareLink } from '#lib/share.ts';
 	import { getJson } from '#lib/offline.svelte.ts';
+	import { poll } from '#lib/poll.ts';
 	import MapSearch from '#lib/MapSearch.svelte';
 	import { bboxPolygon, powiatBboxes } from '#lib/bboxes.ts';
 	import type { PlaceHit } from '#lib/search.ts';
@@ -241,14 +242,13 @@
 		loadStatus();
 		loadAircraft();
 		loadSatellites();
-		const timers = [
-			setInterval(loadAircraft, AIRCRAFT_REFRESH_MS),
-			setInterval(loadSatellites, SAT_REFRESH_MS),
-			setInterval(loadEvents, EVENTS_REFRESH_MS),
-			setInterval(loadStatus, STATUS_REFRESH_MS),
-			setInterval(() => (now = Date.now()), 30_000)
-		];
-		return () => timers.forEach(clearInterval);
+		return poll([
+			{ run: loadAircraft, everyMs: AIRCRAFT_REFRESH_MS },
+			{ run: loadSatellites, everyMs: SAT_REFRESH_MS },
+			{ run: loadEvents, everyMs: EVENTS_REFRESH_MS },
+			{ run: loadStatus, everyMs: STATUS_REFRESH_MS },
+			{ run: () => (now = Date.now()), everyMs: 30_000 }
+		]);
 	});
 </script>
 
