@@ -134,6 +134,43 @@ export function positionsAt(
 	return { type: 'FeatureCollection', features };
 }
 
+type Bounds = [[number, number], [number, number]];
+
+/** How often the full set is scanned for satellites near the bounds. */
+export const RESCAN_MS = 30_000;
+/** Margin around the bounds for that scan. A LEO satellite covers ~235 km (2–3° of longitude
+ * at Polish latitudes) in 30 s, so 5° can't be crossed between scans. */
+export const RESCAN_MARGIN_DEG = 5;
+
+/**
+ * Propagating every tracked satellite every second is the main CPU cost (~20 ms for 10k
+ * Starlinks on a fast laptop, several times more on phones) although only a few dozen are
+ * ever over Poland. Instead: scan all every RESCAN_MS for candidates within a margin, and
+ * propagate only those each tick. Same output as `positionsAt(all, …)`.
+ */
+export function createTracker(entries: SatEntry[], bounds: Bounds) {
+	const [[w, s], [e, n]] = bounds;
+	const wide: Bounds = [
+		[w - RESCAN_MARGIN_DEG, s - RESCAN_MARGIN_DEG],
+		[e + RESCAN_MARGIN_DEG, n + RESCAN_MARGIN_DEG]
+	];
+	let candidates: SatEntry[] = [];
+	let scannedAt = -Infinity;
+	return {
+		positions(when: Date): SatFeatureCollection {
+			if (when.getTime() - scannedAt >= RESCAN_MS || when.getTime() < scannedAt) {
+				const near = new Set(positionsAt(entries, when, wide).features.map((f) => f.id));
+				candidates = entries.filter((x) => near.has(x.norad_id));
+				scannedAt = when.getTime();
+			}
+			return positionsAt(candidates, when, bounds);
+		},
+		get candidateCount() {
+			return candidates.length;
+		}
+	};
+}
+
 export function orbitalPeriodMin(altitudeKm: number): number {
 	const a = EARTH_RADIUS_KM + altitudeKm;
 	// T = 2π√(a³/µ), µ = 398600 km³/s²; in minutes.

@@ -26,7 +26,7 @@
 	import {
 		SAT_GROUPS,
 		parseEntries,
-		positionsAt,
+		createTracker,
 		type SatEntry,
 		type SatProps,
 		type SatTle
@@ -74,23 +74,30 @@
 		onsatcount
 	}: Props = $props();
 
-	// Parsed SGP4 records; rebuilt only when the TLE set changes, then propagated every second.
-	// Rebuilt only when the TLE set changes, then propagated every second.
+	// Rough box around Poland for the satellite filter (the map's own limits are computed per
+	// screen size in lockToPoland).
+	const POLAND_MAX_BOUNDS: [[number, number], [number, number]] = [
+		[12.2, 48.4],
+		[26.0, 55.6]
+	];
+
+	// Parsed SGP4 records, rebuilt only when the TLE set changes; the tracker propagates only
+	// satellites near Poland each second (see createTracker).
 	const satEntries: SatEntry[] = $derived(parseEntries(satelliteTles));
+	const satTracker = $derived(createTracker(satEntries, POLAND_MAX_BOUNDS));
 	let satTimer: ReturnType<typeof setInterval> | undefined;
 
-	/** Propagate ~every second (a LEO satellite moves ~7.5 km/s, so slower looks jumpy);
-	 *  on phones, ease off to 2 s when many satellites are tracked (e.g. Starlink on). */
+	/** Propagate ~every second (a LEO satellite moves ~7.5 km/s, so slower looks jumpy).
+	 *  Skipped while the tab is hidden: nobody sees it, and it costs battery. */
 	function startSatellites(m: MlMap): void {
-		const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 719px)').matches;
 		const tick = () => {
 			const src = m.getSource('satellites') as GeoJSONSource | undefined;
-			if (src) {
-				const fc = positionsAt(satEntries, new Date(), POLAND_MAX_BOUNDS);
+			if (src && !document.hidden) {
+				const fc = satTracker.positions(new Date());
 				src.setData(fc);
 				onsatcount?.(fc.features.length);
 			}
-			satTimer = setTimeout(tick, phone && satEntries.length > 2000 ? 2000 : 1000);
+			satTimer = setTimeout(tick, 1000);
 		};
 		tick();
 	}
@@ -156,13 +163,6 @@
 		...AIRCRAFT_CLASSES.flatMap((c) => [c.id, c.color]),
 		'#d8dee6'
 	] as unknown as string;
-
-	// Rough box around Poland for the satellite filter (the map's own limits are computed per
-	// screen size in lockToPoland).
-	const POLAND_MAX_BOUNDS: [[number, number], [number, number]] = [
-		[12.2, 48.4],
-		[26.0, 55.6]
-	];
 
 	/** Room for the floating layers panel on wide screens, so it doesn't cover western Poland. */
 	const fitPadding = (width: number) => {
